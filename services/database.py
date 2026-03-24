@@ -3,10 +3,19 @@ Database service module for managing PostgreSQL operations.
 Handles document and extracted text persistence.
 """
 import logging
+from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from config import settings
-from models import Base, Document, ExtractedText, VectorEmbedding
+from models import (
+    Base,
+    Document,
+    ExtractedText,
+    VectorEmbedding,
+    Analysis,
+    AnalysisOutput,
+    AnalysisEvent,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -263,6 +272,211 @@ class DatabaseService:
         except Exception as e:
             session.rollback()
             logger.error(f"Failed to save vector embedding metadata: {str(e)}")
+            raise
+        finally:
+            session.close()
+
+    def create_analysis(
+        self,
+        document_id: int,
+        model_version: str = "v1"
+    ) -> Analysis:
+        """
+        Create a queued analysis task record.
+
+        Args:
+            document_id: ID of the source document
+            model_version: Analysis model/version label
+
+        Returns:
+            Saved Analysis object
+        """
+        session = self.get_session()
+        try:
+            analysis = Analysis(
+                document_id=document_id,
+                status="queued",
+                model_version=model_version
+            )
+            session.add(analysis)
+            session.commit()
+            session.refresh(analysis)
+            logger.info(f"Analysis created: ID={analysis.id}, document_id={document_id}")
+            return analysis
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to create analysis: {str(e)}")
+            raise
+        finally:
+            session.close()
+
+    def get_analysis(self, analysis_id: int) -> Analysis:
+        """
+        Retrieve analysis by ID.
+
+        Args:
+            analysis_id: Analysis ID
+
+        Returns:
+            Analysis object or None if not found
+        """
+        session = self.get_session()
+        try:
+            return session.query(Analysis).filter(Analysis.id == analysis_id).first()
+        finally:
+            session.close()
+
+    def update_analysis_status(
+        self,
+        analysis_id: int,
+        status: str,
+        error: str = None,
+        started_at: datetime = None,
+        finished_at: datetime = None
+    ) -> Analysis:
+        """
+        Update analysis status and optional timestamps/error.
+
+        Args:
+            analysis_id: Analysis ID
+            status: New status (queued, processing, done, failed)
+            error: Optional error message
+            started_at: Optional start timestamp override
+            finished_at: Optional finish timestamp override
+
+        Returns:
+            Updated Analysis object
+        """
+        session = self.get_session()
+        try:
+            analysis = session.query(Analysis).filter(Analysis.id == analysis_id).first()
+            if not analysis:
+                raise ValueError(f"Analysis not found: {analysis_id}")
+
+            analysis.status = status
+            analysis.error = error
+
+            if started_at:
+                analysis.started_at = started_at
+            elif status == "processing" and analysis.started_at is None:
+                analysis.started_at = datetime.utcnow()
+
+            if finished_at:
+                analysis.finished_at = finished_at
+            elif status in ("done", "failed"):
+                analysis.finished_at = datetime.utcnow()
+
+            session.commit()
+            session.refresh(analysis)
+            return analysis
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to update analysis status: {str(e)}")
+            raise
+        finally:
+            session.close()
+
+    def save_analysis_output(
+        self,
+        analysis_id: int,
+        legal_json: dict = None,
+        risk_json: dict = None,
+        valuation_json: dict = None,
+        final_json: dict = None
+    ) -> AnalysisOutput:
+        """
+        Save or update analysis output payloads.
+
+        Args:
+            analysis_id: Analysis ID
+            legal_json: Legal module output
+            risk_json: Risk module output
+            valuation_json: Valuation module output
+            final_json: Aggregated final output
+
+        Returns:
+            Saved AnalysisOutput object
+        """
+        session = self.get_session()
+        try:
+            output = session.query(AnalysisOutput).filter(
+                AnalysisOutput.analysis_id == analysis_id
+            ).first()
+
+            if output:
+                output.legal_json = legal_json
+                output.risk_json = risk_json
+                output.valuation_json = valuation_json
+                output.final_json = final_json
+            else:
+                output = AnalysisOutput(
+                    analysis_id=analysis_id,
+                    legal_json=legal_json,
+                    risk_json=risk_json,
+                    valuation_json=valuation_json,
+                    final_json=final_json,
+                )
+                session.add(output)
+
+            session.commit()
+            session.refresh(output)
+            return output
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to save analysis output: {str(e)}")
+            raise
+        finally:
+            session.close()
+
+    def get_analysis_output(self, analysis_id: int) -> AnalysisOutput:
+        """
+        Retrieve analysis outputs by analysis ID.
+
+        Args:
+            analysis_id: Analysis ID
+
+        Returns:
+            AnalysisOutput or None
+        """
+        session = self.get_session()
+        try:
+            return session.query(AnalysisOutput).filter(
+                AnalysisOutput.analysis_id == analysis_id
+            ).first()
+        finally:
+            session.close()
+
+    def add_analysis_event(
+        self,
+        analysis_id: int,
+        stage: str,
+        payload: dict = None
+    ) -> AnalysisEvent:
+        """
+        Add an analysis lifecycle event.
+
+        Args:
+            analysis_id: Analysis ID
+            stage: Event stage label
+            payload: Optional event payload
+
+        Returns:
+            Saved AnalysisEvent object
+        """
+        session = self.get_session()
+        try:
+            event = AnalysisEvent(
+                analysis_id=analysis_id,
+                stage=stage,
+                payload=payload,
+            )
+            session.add(event)
+            session.commit()
+            session.refresh(event)
+            return event
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to add analysis event: {str(e)}")
             raise
         finally:
             session.close()

@@ -21,6 +21,20 @@ services:
     networks:
       - dms-network
 
+  # Redis broker for Celery
+  redis:
+    image: redis:7-alpine
+    container_name: dms-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dms-network
+
   # FastAPI Application Service
   api:
     build:
@@ -31,6 +45,8 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/document_management
       DEBUG: "False"
       LOG_LEVEL: INFO
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
     ports:
       - "8000:8000"
     volumes:
@@ -38,6 +54,8 @@ services:
       - ./logs:/app/logs
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - dms-network
@@ -48,6 +66,33 @@ services:
       --bind 0.0.0.0:8000 
       --access-logfile - 
       --error-logfile -
+
+  # Celery worker for async analysis
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dms-worker
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/document_management
+      DEBUG: "False"
+      LOG_LEVEL: INFO
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+      - ./vector_indices:/app/vector_indices
+      - ./regulation_indices:/app/regulation_indices
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - dms-network
+    command: >
+      celery -A worker.celery_app worker --loglevel=info
 
 networks:
   dms-network:

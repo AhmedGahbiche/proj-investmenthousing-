@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1000" viewBox="0 0 1400 1000">
+  <defs>
+    <style>
+      .title { font: 700 28px Segoe UI, Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 500 15px Segoe UI, Arial, sans-serif; fill: #334155; }
+      .label { font: 600 14px Segoe UI, Arial, sans-serif; fill: #0f172a; }
+      .small { font: 500 12px Segoe UI, Arial, sans-serif; fill: #334155; }
+      .box { rx: 14; ry: 14; stroke-width: 2; }
+      .arrow { stroke: #334155; stroke-width: 2.2; fill: none; marker-end: url(#arrowhead); }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#334155" />
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1400" height="1000" fill="#f8fafc"/>
+
+  <text x="700" y="46" text-anchor="middle" class="title">Taqim Backend Architecture</text>
+  <text x="700" y="72" text-anchor="middle" class="subtitle">FastAPI + PostgreSQL + Redis + Celery + FAISS + OpenAI Intelligence</text>
+
+  <rect x="70" y="140" width="210" height="90" class="box" fill="#dbeafe" stroke="#2563eb"/>
+  <text x="175" y="175" text-anchor="middle" class="label">Client App</text>
+  <text x="175" y="198" text-anchor="middle" class="small">Web / Mobile / Admin</text>
+
+  <rect x="340" y="120" width="300" height="140" class="box" fill="#dcfce7" stroke="#16a34a"/>
+  <text x="490" y="155" text-anchor="middle" class="label">FastAPI API</text>
+  <text x="490" y="178" text-anchor="middle" class="small">/upload, /search, /analyze, /health</text>
+  <text x="490" y="201" text-anchor="middle" class="small">request validation + orchestration</text>
+
+  <rect x="700" y="120" width="260" height="140" class="box" fill="#fee2e2" stroke="#dc2626"/>
+  <text x="830" y="155" text-anchor="middle" class="label">PostgreSQL</text>
+  <text x="830" y="178" text-anchor="middle" class="small">documents, extracted_texts,</text>
+  <text x="830" y="198" text-anchor="middle" class="small">analyses, outputs, events</text>
+
+  <rect x="1010" y="120" width="220" height="140" class="box" fill="#fef3c7" stroke="#d97706"/>
+  <text x="1120" y="155" text-anchor="middle" class="label">Redis</text>
+  <text x="1120" y="178" text-anchor="middle" class="small">Celery broker + result backend</text>
+
+  <rect x="340" y="320" width="300" height="120" class="box" fill="#e0e7ff" stroke="#4f46e5"/>
+  <text x="490" y="355" text-anchor="middle" class="label">Upload Pipeline</text>
+  <text x="490" y="378" text-anchor="middle" class="small">file storage + text extraction</text>
+  <text x="490" y="400" text-anchor="middle" class="small">sanitization + DB persist</text>
+
+  <rect x="700" y="320" width="260" height="120" class="box" fill="#ede9fe" stroke="#7c3aed"/>
+  <text x="830" y="355" text-anchor="middle" class="label">FAISS Document Index</text>
+  <text x="830" y="378" text-anchor="middle" class="small">chunk + embed uploaded docs</text>
+
+  <rect x="1010" y="320" width="220" height="120" class="box" fill="#f5d0fe" stroke="#a21caf"/>
+  <text x="1120" y="355" text-anchor="middle" class="label">FAISS Regulation Index</text>
+  <text x="1120" y="378" text-anchor="middle" class="small">top-k legal context retrieval</text>
+
+  <rect x="340" y="500" width="300" height="150" class="box" fill="#cffafe" stroke="#0891b2"/>
+  <text x="490" y="535" text-anchor="middle" class="label">Celery Worker</text>
+  <text x="490" y="558" text-anchor="middle" class="small">run_analysis_task(document_id, analysis_id)</text>
+  <text x="490" y="580" text-anchor="middle" class="small">status updates + retries + events</text>
+
+  <rect x="700" y="500" width="530" height="260" class="box" fill="#fae8ff" stroke="#9333ea"/>
+  <text x="965" y="535" text-anchor="middle" class="label">OpenAI Analysis Intelligence</text>
+  <text x="965" y="558" text-anchor="middle" class="small">parallel module analysis + final due diligence synthesis</text>
+
+  <rect x="730" y="585" width="150" height="120" class="box" fill="#ffe4e6" stroke="#e11d48"/>
+  <text x="805" y="620" text-anchor="middle" class="label">Legal</text>
+  <text x="805" y="642" text-anchor="middle" class="small">validity</text>
+  <text x="805" y="660" text-anchor="middle" class="small">missing fields</text>
+
+  <rect x="895" y="585" width="150" height="120" class="box" fill="#ffedd5" stroke="#ea580c"/>
+  <text x="970" y="620" text-anchor="middle" class="label">Risk</text>
+  <text x="970" y="642" text-anchor="middle" class="small">construction</text>
+  <text x="970" y="660" text-anchor="middle" class="small">materials</text>
+
+  <rect x="1060" y="585" width="150" height="120" class="box" fill="#ecfccb" stroke="#65a30d"/>
+  <text x="1135" y="620" text-anchor="middle" class="label">Valuation</text>
+  <text x="1135" y="642" text-anchor="middle" class="small">price fairness</text>
+  <text x="1135" y="660" text-anchor="middle" class="small">ROI estimate</text>
+
+  <rect x="730" y="790" width="480" height="110" class="box" fill="#dbeafe" stroke="#1d4ed8"/>
+  <text x="970" y="825" text-anchor="middle" class="label">Final Synthesis</text>
+  <text x="970" y="847" text-anchor="middle" class="small">overall score + risk + recommendations</text>
+
+  <line x1="280" y1="185" x2="340" y2="185" class="arrow"/>
+  <text x="300" y="170" class="small">HTTP</text>
+
+  <line x1="640" y1="165" x2="700" y2="165" class="arrow"/>
+  <line x1="640" y1="225" x2="1010" y2="225" class="arrow"/>
+  <text x="840" y="212" class="small">enqueue analysis</text>
+
+  <line x1="490" y1="260" x2="490" y2="320" class="arrow"/>
+  <line x1="640" y1="380" x2="700" y2="380" class="arrow"/>
+  <line x1="640" y1="345" x2="700" y2="165" class="arrow"/>
+
+  <line x1="1120" y1="260" x2="1120" y2="500" class="arrow"/>
+  <line x1="1120" y1="500" x2="640" y2="575" class="arrow"/>
+  <text x="990" y="470" class="small">task delivery</text>
+
+  <line x1="640" y1="575" x2="700" y2="575" class="arrow"/>
+  <line x1="960" y1="440" x2="960" y2="500" class="arrow"/>
+  <line x1="1120" y1="440" x2="1120" y2="500" class="arrow"/>
+
+  <line x1="805" y1="705" x2="805" y2="790" class="arrow"/>
+  <line x1="970" y1="705" x2="970" y2="790" class="arrow"/>
+  <line x1="1135" y1="705" x2="1135" y2="790" class="arrow"/>
+
+  <line x1="730" y1="845" x2="640" y2="845" class="arrow"/>
+  <line x1="640" y1="845" x2="640" y2="590" class="arrow"/>
+  <line x1="640" y1="590" x2="700" y2="165" class="arrow"/>
+  <text x="656" y="640" class="small">persist outputs/status</text>
+
+  <line x1="340" y1="205" x2="280" y2="205" class="arrow"/>
+  <text x="190" y="250" class="small">poll /analyze/{id} for results</text>
+</svg>

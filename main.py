@@ -10,12 +10,21 @@ from pathlib import Path
 
 from config import settings
 from models import (
-    DocumentResponse, ExtractedTextResponse, UploadResponse, 
-    DocumentWithTextResponse, SemanticSearchResponse, SearchResult
+    DocumentResponse,
+    ExtractedTextResponse,
+    UploadResponse,
+    DocumentWithTextResponse,
+    SemanticSearchResponse,
+    SearchResult,
+    AnalyzeRequest,
+    AnalyzeCreateResponse,
+    AnalysisStatusResponse,
+    AnalysisOutputResponse,
 )
 from services.upload_service import upload_service
 from services.database import db_service
 from services.vector_service import vector_service
+from services.analysis_tasks import run_analysis_task
 from services.dependency_checker import dependency_checker
 from services.text_validator import text_validator
 
@@ -129,6 +138,103 @@ async def health_check():
         "service": settings.APP_NAME,
         "version": settings.APP_VERSION
     }
+
+
+@app.post(
+    "/analyze",
+    response_model=AnalyzeCreateResponse,
+    summary="Queue asynchronous analysis for a document",
+    tags=["Analysis"]
+)
+async def queue_analysis(request: AnalyzeRequest) -> AnalyzeCreateResponse:
+    """
+    Trigger async document analysis.
+
+    Flow:
+    1. Validate document exists
+    2. Create analysis row with queued status
+    3. Enqueue Celery task
+    """
+    try:
+        document = db_service.get_document(request.document_id)
+        if not document:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Document with ID {request.document_id} not found"
+            )
+
+        analysis = db_service.create_analysis(
+            document_id=request.document_id,
+            model_version=request.model_version or "v1"
+        )
+        db_service.add_analysis_event(analysis.id, stage="queued")
+
+        task = run_analysis_task.delay(request.document_id, analysis.id)
+
+        return AnalyzeCreateResponse(
+            success=True,
+            analysis_id=analysis.id,
+            document_id=request.document_id,
+            status=analysis.status,
+            task_id=task.id,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to queue analysis: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error while queuing analysis"
+        )
+
+
+@app.get(
+    "/analyze/{analysis_id}",
+    response_model=AnalysisStatusResponse,
+    summary="Get analysis status and outputs",
+    tags=["Analysis"]
+)
+async def get_analysis_status(analysis_id: int) -> AnalysisStatusResponse:
+    """
+    Retrieve analysis status and outputs when available.
+    """
+    try:
+        analysis = db_service.get_analysis(analysis_id)
+        if not analysis:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Analysis with ID {analysis_id} not found"
+            )
+
+        output = db_service.get_analysis_output(analysis_id)
+        response_output = None
+
+        if output:
+            response_output = AnalysisOutputResponse(
+                legal_json=output.legal_json,
+                risk_json=output.risk_json,
+                valuation_json=output.valuation_json,
+                final_json=output.final_json,
+            )
+
+        return AnalysisStatusResponse(
+            analysis_id=analysis.id,
+            document_id=analysis.document_id,
+            status=analysis.status,
+            started_at=analysis.started_at,
+            finished_at=analysis.finished_at,
+            error=analysis.error,
+            model_version=analysis.model_version,
+            outputs=response_output,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch analysis status: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error while fetching analysis status"
+        )
 
 
 # ============================================================================
@@ -432,7 +538,7 @@ async def search_document(
         
         # Perform semantic search
         search_results = vector_service.search_document(
-            document_id=str(document_id),
+            document_id=document_id,
             query=query,
             k=k
         )

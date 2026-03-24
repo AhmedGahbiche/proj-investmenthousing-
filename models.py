@@ -2,10 +2,10 @@
 Database models for document management service.
 """
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Index
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Index, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 
 # SQLAlchemy ORM Base
 Base = declarative_base()
@@ -141,6 +141,57 @@ class VectorEmbedding(Base):
     )
 
 
+class Analysis(Base):
+    """
+    SQLAlchemy model for tracking asynchronous analysis jobs.
+    """
+    __tablename__ = "analyses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(Integer, ForeignKey("documents.id"), nullable=False)
+    status = Column(String(20), nullable=False, default="queued")
+    started_at = Column(DateTime, nullable=True)
+    finished_at = Column(DateTime, nullable=True)
+    error = Column(Text, nullable=True)
+    model_version = Column(String(100), nullable=True)
+
+    __table_args__ = (
+        Index('idx_analyses_document_id', 'document_id'),
+        Index('idx_analyses_status', 'status'),
+    )
+
+
+class AnalysisOutput(Base):
+    """
+    SQLAlchemy model for analysis outputs per analysis run.
+    """
+    __tablename__ = "analysis_outputs"
+
+    analysis_id = Column(Integer, ForeignKey("analyses.id"), primary_key=True)
+    legal_json = Column(JSON, nullable=True)
+    risk_json = Column(JSON, nullable=True)
+    valuation_json = Column(JSON, nullable=True)
+    final_json = Column(JSON, nullable=True)
+
+
+class AnalysisEvent(Base):
+    """
+    SQLAlchemy model for optional analysis stage events.
+    """
+    __tablename__ = "analysis_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    analysis_id = Column(Integer, ForeignKey("analyses.id"), nullable=False)
+    stage = Column(String(100), nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    payload = Column(JSON, nullable=True)
+
+    __table_args__ = (
+        Index('idx_analysis_events_analysis_id', 'analysis_id'),
+        Index('idx_analysis_events_stage', 'stage'),
+    )
+
+
 # ============================================================================
 # Pydantic Schema Models for Vector Operations
 # ============================================================================
@@ -175,3 +226,38 @@ class SemanticSearchResponse(BaseModel):
     num_results: int
     results: List[SearchResult]
     error: Optional[str] = None
+
+
+class AnalyzeRequest(BaseModel):
+    """Schema for creating an analysis task."""
+    document_id: int
+    model_version: Optional[str] = "v1"
+
+
+class AnalyzeCreateResponse(BaseModel):
+    """Schema for analysis creation response."""
+    success: bool
+    analysis_id: int
+    document_id: int
+    status: str
+    task_id: Optional[str] = None
+
+
+class AnalysisOutputResponse(BaseModel):
+    """Schema for analysis output payload."""
+    legal_json: Optional[dict] = None
+    risk_json: Optional[dict] = None
+    valuation_json: Optional[dict] = None
+    final_json: Optional[dict] = None
+
+
+class AnalysisStatusResponse(BaseModel):
+    """Schema for analysis status response."""
+    analysis_id: int
+    document_id: int
+    status: str
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    error: Optional[str] = None
+    model_version: Optional[str] = None
+    outputs: Optional[AnalysisOutputResponse] = None

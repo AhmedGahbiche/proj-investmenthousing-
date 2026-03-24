@@ -4,18 +4,13 @@ Supports PDF, DOCX, PNG (with OCR), and TXT formats.
 Includes timeout protection, error handling, and text validation.
 """
 import logging
-import signal
 from pathlib import Path
 from typing import Tuple
 from functools import wraps
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from services.text_validator import text_validator
 
 logger = logging.getLogger(__name__)
-
-
-def timeout_handler(signum, frame):
-    """Handle timeout during text extraction."""
-    raise TimeoutError("Text extraction operation timed out")
 
 
 def extract_with_timeout(timeout_seconds: int = 60):
@@ -28,18 +23,16 @@ def extract_with_timeout(timeout_seconds: int = 60):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            # Set signal handler
-            signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(timeout_seconds)
+            executor = ThreadPoolExecutor(max_workers=1)
+            future = executor.submit(func, *args, **kwargs)
             try:
-                result = func(*args, **kwargs)
-                signal.alarm(0)  # Cancel alarm
-                return result
-            except TimeoutError:
+                return future.result(timeout=timeout_seconds)
+            except FuturesTimeoutError as e:
                 logger.error(f"Extraction timeout after {timeout_seconds}s")
-                raise
+                future.cancel()
+                raise TimeoutError("Text extraction operation timed out") from e
             finally:
-                signal.alarm(0)  # Ensure alarm is cancelled
+                executor.shutdown(wait=False, cancel_futures=True)
         return wrapper
     return decorator
 

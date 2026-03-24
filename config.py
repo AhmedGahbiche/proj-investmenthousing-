@@ -4,6 +4,7 @@ Configuration settings for the document management service.
 import os
 from pathlib import Path
 from pydantic_settings import BaseSettings
+from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -25,6 +26,16 @@ class Settings(BaseSettings):
     # Logging Settings
     LOG_DIR: str = "./logs"
     LOG_LEVEL: str = "INFO"
+
+    # Async Analysis Settings
+    CELERY_BROKER_URL: str = "redis://redis:6379/0"
+    CELERY_RESULT_BACKEND: str = "redis://redis:6379/1"
+
+    # OpenAI Analysis Settings
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-5"
+    OPENAI_BASE_URL: Optional[str] = None
+    OPENAI_TIMEOUT_SECONDS: int = 120
     
     class Config:
         env_file = ".env"
