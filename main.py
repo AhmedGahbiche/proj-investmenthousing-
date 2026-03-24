@@ -811,6 +811,96 @@ async def get_system_status():
 
 
 # ============================================================================
+
+# ============================================================================
+# Stage 3: Report Generation Endpoints
+# ============================================================================
+
+@app.post("/reports/{analysis_id}")
+async def create_report(
+    analysis_id: str,
+    include_pdf: bool = True,
+    save_html: bool = True
+):
+    """Generate complete analysis report from existing analysis."""
+    try:
+        from services.report_generator import report_generator
+        from datetime import datetime
+        
+        # Retrieve analysis data
+        analysis_data = await db_service.get_analysis_by_id(analysis_id)
+        if not analysis_data:
+            raise HTTPException(status_code=404, detail="Analysis not found")
+        
+        # Parse analysis outputs
+        analysis_dict = {
+            'risk_analysis': json.loads(analysis_data.get('risk_json', '{}')),
+            'legal_analysis': json.loads(analysis_data.            'legal_analysis': js      'valuation_analysis': json.loads(analysis_data.get('valuation_json', '{}')),
+            'material_concerns': [],
+        }
+        
+        # Generate report
+        logger.info(f"Generating report for analysis {analysis_id}")
+        report = report_generator.generate_report(
+            property_id=analysis_data.get('property_id', analysis_id),
+            analysis_data=analysis_dict,
+            include_pdf=include_pdf,
+            save_html=save_html,
+            metadata={
+                'date': datetime.now().isoformat(),
+                'analysis_id': analysis_id,
+            }
+        )
+        
+        return {
+            "report_id": report.report_id,
+            "property_id": report.property_id,
+            "status": report.status,
+            "generated_at": report.analysis_date,
+            "files": {
+                "pdf_path": report.pdf_path,
+            },
+            "error": report.error_message,
+        }
+        
+    except Exception as e:
+        logger.error(f"Error creating report: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/reports/{report_id}")
+async def get_report(report_id: str):
+    """Get report metadata and status."""
+    try:
+        from services.report_generator import report_generator
+        
+        report_meta = report_generator.get_report(report_id)
+        if not report_meta:
+            raise HTTPException(status_code=404, detail="Report not found")
+        
+        return report_meta
+        
+    except Exception as e:
+        logger.error(f"Error getting report: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/reports")
+async def list_reports(limit: int = 10):
+    """List generated reports."""
+    try:
+        from services.report_generator import report_generator
+        
+        reports = report_generator.list_reports()
+        return {
+            "total": len(reports),
+            "reports": reports[:limit]
+        }
+        
+    except Exception as e:
+        logger.error(f"Error listing reports: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Error Handlers
 # ============================================================================
 
