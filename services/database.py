@@ -1,0 +1,272 @@
+"""
+Database service module for managing PostgreSQL operations.
+Handles document and extracted text persistence.
+"""
+import logging
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session
+from config import settings
+from models import Base, Document, ExtractedText, VectorEmbedding
+
+logger = logging.getLogger(__name__)
+
+
+class DatabaseService:
+    """Service for managing database operations."""
+    
+    def __init__(self, database_url: str = settings.DATABASE_URL):
+        """
+        Initialize database connection.
+        
+        Args:
+            database_url: PostgreSQL connection string
+        """
+        try:
+            self.engine = create_engine(
+                database_url,
+                echo=settings.DEBUG,
+                pool_pre_ping=True,  # Verify connections before using
+                pool_recycle=3600,   # Recycle connections every hour
+            )
+            self.SessionLocal = sessionmaker(
+                autocommit=False,
+                autoflush=False,
+                bind=self.engine
+            )
+            logger.info("Database engine initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize database engine: {str(e)}")
+            raise
+    
+    def init_db(self):
+        """
+        Initialize database tables.
+        Creates tables if they don't exist.
+        """
+        try:
+            Base.metadata.create_all(bind=self.engine)
+            logger.info("Database tables created/verified successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize database tables: {str(e)}")
+            raise
+    
+    def get_session(self) -> Session:
+        """
+        Get a new database session.
+        
+        Returns:
+            SQLAlchemy session object
+        """
+        return self.SessionLocal()
+    
+    def save_document(
+        self,
+        filename: str,
+        file_format: str,
+        file_path: str,
+        file_size: int,
+        document_type: str = None,
+        property_id: str = None
+    ) -> Document:
+        """
+        Save document metadata to database.
+        
+        Args:
+            filename: Original filename
+            file_format: File format (pdf, docx, png, txt)
+            file_path: Path where file is stored
+            file_size: File size in bytes
+            document_type: Optional document type classification
+            property_id: Optional property ID reference
+            
+        Returns:
+            Saved Document object
+            
+        Raises:
+            Exception: If database operation fails
+        """
+        session = self.get_session()
+        try:
+            document = Document(
+                filename=filename,
+                file_format=file_format,
+                file_path=file_path,
+                file_size=file_size,
+                document_type=document_type,
+                property_id=property_id
+            )
+            session.add(document)
+            session.commit()
+            session.refresh(document)
+            logger.info(f"Document saved successfully: {filename} (ID: {document.id})")
+            return document
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to save document: {str(e)}")
+            raise
+        finally:
+            session.close()
+    
+    def save_extracted_text(
+        self,
+        document_id: int,
+        raw_text: str,
+        extraction_status: str = "success",
+        extraction_error: str = None
+    ) -> ExtractedText:
+        """
+        Save extracted text content to database.
+        
+        Args:
+            document_id: ID of the document
+            raw_text: Extracted text content
+            extraction_status: Status of extraction (success, failed, partial)
+            extraction_error: Optional error message if extraction failed
+            
+        Returns:
+            Saved ExtractedText object
+            
+        Raises:
+            Exception: If database operation fails
+        """
+        session = self.get_session()
+        try:
+            extracted_text = ExtractedText(
+                document_id=document_id,
+                raw_text=raw_text,
+                extraction_status=extraction_status,
+                extraction_error=extraction_error
+            )
+            session.add(extracted_text)
+            session.commit()
+            session.refresh(extracted_text)
+            logger.info(f"Extracted text saved successfully for document ID: {document_id}")
+            return extracted_text
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to save extracted text: {str(e)}")
+            raise
+        finally:
+            session.close()
+    
+    def get_document(self, document_id: int) -> Document:
+        """
+        Retrieve document by ID.
+        
+        Args:
+            document_id: Document ID
+            
+        Returns:
+            Document object or None if not found
+        """
+        session = self.get_session()
+        try:
+            document = session.query(Document).filter(
+                Document.id == document_id
+            ).first()
+            return document
+        finally:
+            session.close()
+    
+    def get_document_text(self, document_id: int) -> ExtractedText:
+        """
+        Retrieve extracted text for a document.
+        
+        Args:
+            document_id: Document ID
+            
+        Returns:
+            ExtractedText object or None if not found
+        """
+        session = self.get_session()
+        try:
+            extracted_text = session.query(ExtractedText).filter(
+                ExtractedText.document_id == document_id
+            ).first()
+            return extracted_text
+        finally:
+            session.close()
+    
+    def get_all_documents(self, limit: int = 100, offset: int = 0) -> list:
+        """
+        Retrieve all documents with pagination.
+        
+        Args:
+            limit: Maximum number of documents to return
+            offset: Number of documents to skip
+            
+        Returns:
+            List of Document objects
+        """
+        session = self.get_session()
+        try:
+            documents = session.query(Document).offset(offset).limit(limit).all()
+            return documents
+        finally:
+            session.close()
+    
+    def save_vector_embedding_metadata(
+        self,
+        document_id: int,
+        num_chunks: int,
+        embedding_model: str = "all-MiniLM-L6-v2",
+        chunk_size: int = 512,
+        chunk_overlap: int = 50
+    ) -> VectorEmbedding:
+        """
+        Save vector embedding metadata to database.
+        
+        Args:
+            document_id: ID of the document
+            num_chunks: Number of chunks created for this document
+            embedding_model: Name of the embedding model used
+            chunk_size: Size of each chunk
+            chunk_overlap: Overlap between chunks
+            
+        Returns:
+            Saved VectorEmbedding object
+            
+        Raises:
+            Exception: If database operation fails
+        """
+        session = self.get_session()
+        try:
+            # Check if embedding metadata already exists
+            existing = session.query(VectorEmbedding).filter(
+                VectorEmbedding.document_id == document_id
+            ).first()
+            
+            if existing:
+                # Update existing record
+                existing.num_chunks = num_chunks
+                existing.embedding_model = embedding_model
+                existing.chunk_size = chunk_size
+                existing.chunk_overlap = chunk_overlap
+                session.commit()
+                session.refresh(existing)
+                logger.info(f"Vector embedding metadata updated for document ID: {document_id}")
+                return existing
+            else:
+                # Create new record
+                vector_embedding = VectorEmbedding(
+                    document_id=document_id,
+                    num_chunks=num_chunks,
+                    embedding_model=embedding_model,
+                    chunk_size=chunk_size,
+                    chunk_overlap=chunk_overlap
+                )
+                session.add(vector_embedding)
+                session.commit()
+                session.refresh(vector_embedding)
+                logger.info(f"Vector embedding metadata saved successfully for document ID: {document_id}")
+                return vector_embedding
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to save vector embedding metadata: {str(e)}")
+            raise
+        finally:
+            session.close()
+
+
+# Global database service instance
+db_service = DatabaseService()

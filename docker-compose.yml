@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database Service
+  postgres:
+    image: postgres:15-alpine
+    container_name: dms-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: document_management
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dms-network
+
+  # FastAPI Application Service
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dms-api
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/document_management
+      DEBUG: "False"
+      LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dms-network
+    command: >
+      gunicorn main:app 
+      --workers 4 
+      --worker-class uvicorn.workers.UvicornWorker 
+      --bind 0.0.0.0:8000 
+      --access-logfile - 
+      --error-logfile -
+
+networks:
+  dms-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
