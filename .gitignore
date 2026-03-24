@@ -1,29 +1,69 @@
 # Python
+.venv/
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
+*.pyc
+*.pyo
+*.pyd
 *.egg-info/
-.installed.cfg
+.eggs/
+dist/
+build/
 *.egg
 
 # IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+.env.*.local
+.db
+.sqlite3
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Large external libraries
+opencv/
+poppler-25.12.0/
+tessdoc-main/
+
+# Build artifacts
+bin/
+*.dll
+*.pdb
+*.exe
+*.o
+*.so
+
+# Logs
+*.log
+logs/
+uvicorn_log.txt
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+test_err.txt
+test_upload_crash.py
+
+# Application files
+uploads/
+broker/
+control/
+qdrant_storage/
+processed/
+*.pidbox.exchange
+*.exchange
+
+# OS files
+.DS_Store
+Thumbs.db
 .vscode/
 .idea/
 *.swp
