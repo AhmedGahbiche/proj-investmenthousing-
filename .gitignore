@@ -95,3 +95,7 @@ postgres_data/
 # Temporary files
 *.tmp
 *.bak
+
+# Frontend artifacts
+frontend/node_modules/
+frontend/.next/
