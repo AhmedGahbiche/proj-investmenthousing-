@@ -46,15 +46,21 @@ class AnalysisIntelligenceService:
     )
 
     def __init__(self):
+        self.client = None
+        self.model = settings.OPENAI_MODEL
+
+    def _ensure_client(self) -> None:
+        if self.client is not None:
+            return
+
         if not settings.OPENAI_API_KEY:
-            raise ValueError("OPENAI_API_KEY is required for analysis intelligence")
+            raise RuntimeError("OPENAI_API_KEY is required for analysis intelligence")
 
         client_kwargs = {"api_key": settings.OPENAI_API_KEY}
         if settings.OPENAI_BASE_URL:
             client_kwargs["base_url"] = settings.OPENAI_BASE_URL
 
         self.client = OpenAI(**client_kwargs)
-        self.model = settings.OPENAI_MODEL
 
     def _contexts_to_text(self, contexts: List[Dict]) -> str:
         if not contexts:
@@ -69,6 +75,7 @@ class AnalysisIntelligenceService:
         return "\n".join(lines)
 
     def _call_json(self, module_name: str, schema_hint: Dict, document_text: str, contexts: List[Dict]) -> Dict:
+        self._ensure_client()
         context_text = self._contexts_to_text(contexts)
 
         user_prompt = (
@@ -141,6 +148,7 @@ class AnalysisIntelligenceService:
         risk_json: Dict,
         valuation_json: Dict,
     ) -> Dict:
+        self._ensure_client()
         schema_hint = {
             "overall_score": 0,
             "overall_risk": "low|medium|high",

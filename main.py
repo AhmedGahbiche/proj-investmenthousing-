@@ -3,6 +3,7 @@ Main FastAPI application for document management service.
 Provides REST endpoints for document upload, retrieval, and text extraction.
 """
 import logging
+import json
 from logging.handlers import RotatingFileHandler
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query
 from fastapi.responses import JSONResponse
@@ -818,7 +819,7 @@ async def get_system_status():
 
 @app.post("/reports/{analysis_id}")
 async def create_report(
-    analysis_id: str,
+    analysis_id: int,
     include_pdf: bool = True,
     save_html: bool = True
 ):
@@ -826,29 +827,39 @@ async def create_report(
     try:
         from services.report_generator import report_generator
         from datetime import datetime
-        
-        # Retrieve analysis data
-        analysis_data = await db_service.get_analysis_by_id(analysis_id)
-        if not analysis_data:
+
+        analysis = db_service.get_analysis(analysis_id)
+        if not analysis:
             raise HTTPException(status_code=404, detail="Analysis not found")
-        
-        # Parse analysis outputs
+
+        output = db_service.get_analysis_output(analysis_id)
+        if not output:
+            raise HTTPException(status_code=404, detail="Analysis output not found")
+
+        document = db_service.get_document(analysis.document_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+
         analysis_dict = {
-            'risk_analysis': json.loads(analysis_data.get('risk_json', '{}')),
-            'legal_analysis': json.loads(analysis_data.            'legal_analysis': js      'valuation_analysis': json.loads(analysis_data.get('valuation_json', '{}')),
+            'risk_analysis': output.risk_json or {},
+            'legal_analysis': output.legal_json or {},
+            'valuation_analysis': output.valuation_json or {},
+            'final_analysis': output.final_json or {},
             'material_concerns': [],
         }
-        
+
         # Generate report
         logger.info(f"Generating report for analysis {analysis_id}")
         report = report_generator.generate_report(
-            property_id=analysis_data.get('property_id', analysis_id),
+            property_id=document.property_id or str(analysis.document_id),
             analysis_data=analysis_dict,
             include_pdf=include_pdf,
             save_html=save_html,
             metadata={
                 'date': datetime.now().isoformat(),
                 'analysis_id': analysis_id,
+                'document_id': analysis.document_id,
+                'filename': document.filename,
             }
         )
         

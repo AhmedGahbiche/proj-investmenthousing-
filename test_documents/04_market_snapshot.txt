@@ -1,0 +1,20 @@
+MARKET SNAPSHOT - TEST DOCUMENT
+
+Region: Greater Tunis
+Segment: Residential Mid-to-Upper
+Period: Q4 2025
+
+Benchmark Pricing:
+- Median price per m2: 4,850 TND
+- 12-month growth: 6.3%
+- Rental yield estimate: 5.2%
+
+Comparable Sales:
+1) Apartment, 390 m2, sold at 1,880,000 TND
+2) Apartment, 410 m2, sold at 1,950,000 TND
+3) Apartment, 435 m2, sold at 2,070,000 TND
+
+Risk Commentary:
+Low liquidity risk in premium corridors; moderate sensitivity to interest rates.
+
+This file is synthetic and intended for testing only.

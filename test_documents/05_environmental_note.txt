@@ -1,0 +1,15 @@
+ENVIRONMENTAL NOTE - TEST DOCUMENT
+
+Site: PROP-TQ-001
+Inspection Date: 2025-09-03
+Inspector: Internal QA Unit
+
+Summary:
+- No floodplain overlap detected in municipal map.
+- Noise exposure classified as moderate due to nearby arterial road.
+- No hazardous material flags in the current inspection scope.
+
+Recommendation:
+Proceed with standard mitigation clauses in purchase contract.
+
+This file is synthetic and intended for testing only.

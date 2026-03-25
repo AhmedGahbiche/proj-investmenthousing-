@@ -1,7 +1,6 @@
 """
 Configuration settings for the document management service.
 """
-import os
 from pathlib import Path
 from pydantic_settings import BaseSettings
 from typing import Optional
@@ -21,7 +20,7 @@ class Settings(BaseSettings):
     # File Storage Settings
     UPLOAD_DIR: str = "./uploads"
     MAX_FILE_SIZE: int = 50 * 1024 * 1024  # 50 MB
-    ALLOWED_FORMATS: list = ["pdf", "docx", "png", "txt"]
+    ALLOWED_FORMATS: str = "pdf,docx,png,txt"
     
     # Logging Settings
     LOG_DIR: str = "./logs"
@@ -36,7 +35,8 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = "gpt-5"
     OPENAI_BASE_URL: Optional[str] = None
     OPENAI_TIMEOUT_SECONDS: int = 120
-    
+    ANTHROPIC_API_KEY: Optional[str] = ""
+
     class Config:
         env_file = ".env"
         case_sensitive = True

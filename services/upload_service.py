@@ -18,7 +18,10 @@ class UploadService:
     
     def __init__(self):
         """Initialize upload service."""
-        self.allowed_formats = settings.ALLOWED_FORMATS
+        if isinstance(settings.ALLOWED_FORMATS, str):
+            self.allowed_formats = [f.strip().lower() for f in settings.ALLOWED_FORMATS.split(',') if f.strip()]
+        else:
+            self.allowed_formats = [str(f).strip().lower() for f in settings.ALLOWED_FORMATS]
         self.max_file_size = settings.MAX_FILE_SIZE
         # MIME type to format mapping
         self.mime_to_format = {

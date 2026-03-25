@@ -1,0 +1,18 @@
+PROPERTY TAX CERTIFICATE - TEST DOCUMENT
+
+Certificate ID: TAX-8841-2025
+Property ID: PROP-TQ-001
+Owner: North Coast Holdings SARL
+Tax Year: 2025
+Status: Paid
+Outstanding Balance: 0 TND
+
+History:
+- 2023: Paid
+- 2024: Paid
+- 2025: Paid
+
+Comments:
+No arrears or municipal tax penalties were identified.
+
+This file is synthetic and intended for testing only.
