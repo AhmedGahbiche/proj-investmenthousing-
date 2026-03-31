@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  font-family: Inter, Manrope, "Segoe UI", sans-serif;
+  background: #f7f9fc;
+  color: #191c1e;
+}
+
+@layer components {
+  /* Page structure */
+  .page-enter {
+    @apply min-h-screen bg-slate-50 text-slate-900;
+  }
+  .shell {
+    @apply max-w-5xl mx-auto px-6 w-full;
+  }
+  
+  /* Typography */
+  .kicker {
+    @apply text-xs uppercase tracking-widest text-slate-500 font-bold mb-2;
+  }
+  h1 {
+    @apply text-3xl md:text-4xl font-black text-blue-950 tracking-tight;
+  }
+  h2 {
+    @apply text-xl font-bold text-blue-950 mb-3;
+  }
+  h3 {
+    @apply text-lg font-semibold text-slate-800 mb-2;
+  }
+
+  /* Components: Card */
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-slate-200 p-6;
+  }
+
+  /* Components: Buttons */
+  .btn {
+    @apply inline-flex items-center justify-center font-bold rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 px-6 py-3 text-sm disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply bg-blue-950 text-white hover:bg-blue-900 focus:ring-blue-950 shadow-sm border border-transparent;
+  }
+  .btn-ghost {
+    @apply bg-transparent text-blue-950 hover:bg-slate-100 border border-slate-200 shadow-sm;
+  }
+
+  /* Components: Inputs */
+  .input {
+    @apply block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-950/20 focus:border-blue-950 transition-all text-slate-900;
+  }
+}

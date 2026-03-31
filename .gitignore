@@ -1,0 +1,101 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+.env.*.local
+.db
+.sqlite3
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Large external libraries
+opencv/
+poppler-25.12.0/
+tessdoc-main/
+
+# Build artifacts
+bin/
+*.dll
+*.pdb
+*.exe
+*.o
+*.so
+
+# Logs
+*.log
+logs/
+uvicorn_log.txt
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+test_err.txt
+test_upload_crash.py
+
+# Application files
+uploads/
+broker/
+control/
+qdrant_storage/
+processed/
+*.pidbox.exchange
+*.exchange
+
+# OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Application
+uploads/
+logs/
+*.log
+
+# PostgreSQL
+postgres_data/
+
+# Docker
+.dockerignore
+
+# Temporary files
+*.tmp
+*.bak
+
+# Frontend artifacts
+frontend/node_modules/
+frontend/.next/

@@ -1,0 +1,16 @@
+BUILDING PERMIT - TEST DOCUMENT
+
+Permit Number: BP-TR-7741
+Municipality: Ariana
+Issue Date: 2022-06-14
+Expiration Date: 2027-06-14
+Project Address: Rue de la Republique 18, Ariana, Tunisia
+Approved Floors: Ground + 4
+Approved Use: Residential
+
+Compliance Checklist:
+- Structural safety certificate: Present
+- Fire safety sign-off: Present
+- Environmental checklist: Present
+
+This file is synthetic and intended for testing only.
