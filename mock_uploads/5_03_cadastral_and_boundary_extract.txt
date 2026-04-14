@@ -1,0 +1,42 @@
+DOCUMENT: Cadastral and Boundary Extract
+Document ID: ANR-BB-CAD-2026-003
+Prepared By: Atlas Geomatics SARL (synthetic survey memo)
+Survey Reference: AG-LM-118-2026-R1
+
+1) Parcel Data
+- Cadastral Parcel: TN-LM-118-04-2021
+- Municipality: La Marsa
+- Zone: Urban mixed-use ZMU-3
+- Recorded Area: 3,420 m2
+- Measured Area (2026 survey): 3,432 m2
+- Variance: +12 m2 (+0.35%) within accepted tolerance
+
+2) Boundary Coordinates (local grid, abbreviated)
+P1: X=541210.48 Y=402118.73
+P2: X=541284.16 Y=402126.52
+P3: X=541292.04 Y=402081.39
+P4: X=541218.87 Y=402072.94
+
+3) Adjacent Parcels and Uses
+- North boundary: Public road (Avenue de l'Urbanisme), 18 m right-of-way
+- East boundary: Parcel TN-LM-118-05-2021 (residential R+6)
+- South boundary: Service lane and municipal utility corridor
+- West boundary: Parcel TN-LM-117-09-2020 (office building)
+
+4) Easements and Rights-of-Way
+- Underground utility easement (south strip): width 2.5 m
+- Pedestrian access easement to rear transformer room: width 1.8 m
+- No third-party overhang rights recorded
+
+5) Zoning Compliance Notes
+- Permitted use: residential + compatible retail frontage
+- Max footprint ratio: 52%
+- Actual footprint ratio: 49.1%
+- Maximum permitted height: 31 m
+- Actual top parapet height: 29.6 m
+
+6) Surveyor Opinion
+- Parcel identity and boundaries are materially consistent with title references.
+- No encroachment observed on neighboring parcels.
+
+End of document.

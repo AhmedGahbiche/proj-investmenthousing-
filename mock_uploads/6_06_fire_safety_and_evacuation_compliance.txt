@@ -1,0 +1,42 @@
+DOCUMENT: Fire Safety and Evacuation Compliance Report
+Document ID: ANR-BB-FIRE-2026-006
+Inspection Body: SafeLine Prevention Services (synthetic)
+Last Full Audit Date: 2026-02-11
+
+1) Life Safety Systems Inventory
+- Addressable fire alarm control panel: 1 unit (Ground security room)
+- Smoke detectors: 286 units
+- Heat detectors (kitchen/service): 72 units
+- Manual call points: 38 units
+- Fire hose reels: 22 units
+- Portable extinguishers: 164 units
+- Wet riser + hydrant network: operational
+
+2) Means of Egress
+- Enclosed stair cores: 2
+- Pressurized staircase system: operational
+- Exit door release and panic hardware: compliant
+- Exit signage illumination test: pass (2-hour autonomy)
+
+3) Alarm and Evacuation Drill Results
+- Last Drill Date: 2026-01-19
+- Participants: 312 occupants + staff
+- Full evacuation time: 7 min 42 sec
+- Assembly accountability completion: 10 min 31 sec
+- Corrective action: improve floor marshal vest visibility
+
+4) Deficiencies and Corrective Actions
+- Deficiency ID FS-26-014:
+  - Finding: 6 emergency luminaire batteries below autonomy threshold
+  - Risk Level: medium
+  - Target close date: 2026-04-30
+- Deficiency ID FS-26-021:
+  - Finding: 2 extinguishers overdue by 18 days
+  - Risk Level: low
+  - Status: closed on 2026-02-24
+
+5) Compliance Conclusion
+- Overall Fire Safety Status: Compliant with minor corrective actions
+- Critical non-conformities: none
+
+End of document.

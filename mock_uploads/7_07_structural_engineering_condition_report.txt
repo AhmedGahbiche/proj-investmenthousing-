@@ -1,0 +1,41 @@
+DOCUMENT: Structural Engineering Condition Report
+Document ID: ANR-BB-STR-2026-007
+Engineer of Record: Yasmine Engineering Office (synthetic)
+Inspection Dates: 2026-02-03 to 2026-02-05
+
+1) Structural System
+- Foundation: raft + peripheral retaining walls
+- Vertical elements: reinforced concrete columns/shear walls
+- Floor system: reinforced concrete slabs
+- Roof: reinforced slab with technical equipment plinths
+
+2) Scope of Assessment
+- Visual survey of common areas, basements, roof, selected units
+- Crack mapping and photographic log
+- Rebound hammer spot tests (non-destructive)
+- Review of as-built structural drawings and concrete test records
+
+3) Findings
+- No signs of differential settlement observed
+- Hairline shrinkage cracks in basement wall paint layer (non-structural)
+- Two localized moisture ingress points at roof parapet joints
+- No exposed reinforcement or active corrosion observed
+
+4) NDT Spot Test Results
+- Average rebound equivalent strength range: 31 to 37 MPa
+- Design concrete class reference: C30/37
+- Result Interpretation: consistent with design assumptions
+
+5) Risk Rating
+- Structural stability risk: LOW
+- Water ingress related durability risk: MEDIUM (localized)
+
+6) Recommended Actions
+- Seal parapet expansion joints before wet season (Q3 2026)
+- Continue annual crack monitoring in basement parking
+- Renew protective coating in ramp wall zones by Q4 2026
+
+7) Engineer Conclusion
+The building demonstrates satisfactory structural performance for normal residential and retail occupancy. No immediate structural intervention is required.
+
+End of document.

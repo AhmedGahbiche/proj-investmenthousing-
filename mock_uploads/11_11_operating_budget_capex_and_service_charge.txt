@@ -1,0 +1,45 @@
+DOCUMENT: Operating Budget, CAPEX, and Service Charge
+Document ID: ANR-BB-OPEX-2026-011
+Fiscal Year: 2025 Actuals / 2026 Budget
+Currency: TND
+
+1) 2025 Actual Operating Income
+- Residential Rent: 2,746,000
+- Retail Rent: 804,000
+- Parking Income: 148,000
+- Other Recoveries: 93,000
+- Total Gross Income: 3,791,000
+
+2) 2025 Actual Operating Expenses
+- Security Services: 314,000
+- Cleaning and Waste: 196,000
+- Common Electricity: 271,000
+- Water and Sewer: 102,000
+- Elevator Maintenance: 87,000
+- Fire Systems Maintenance: 56,000
+- Insurance: 124,000
+- Property Management Fee: 182,000
+- Repairs and Miscellaneous: 141,000
+- Total OPEX: 1,473,000
+
+3) Net Operating Income (NOI)
+- NOI 2025: 2,318,000
+- NOI Margin: 61.1%
+
+4) 2026 Approved CAPEX Program
+- Roof waterproofing rehabilitation: 210,000 (Q3)
+- BMS and metering upgrade: 95,000 (Q2)
+- Elevator controller modernization (phase 1): 130,000 (Q4)
+- Lobby LED + sensor optimization: 48,000 (Q2)
+- Total CAPEX: 483,000
+
+5) Service Charge Structure (2026)
+- Budgeted service charge rate: 38.5 TND/m2/year
+- Recovery ratio target: 92%
+- Unrecoverable operating cost allowance: 8%
+
+6) Financial Risk Notes
+- Two retail leases represent 23% of retail rent concentration
+- Utility inflation sensitivity remains high for common electricity
+
+End of document.

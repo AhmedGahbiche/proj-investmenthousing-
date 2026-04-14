@@ -1,0 +1,58 @@
+DOCUMENT: Maintenance Log (Last 24 Months)
+Document ID: ANR-BB-MAINT-2026-014
+Coverage Period: 2024-04-01 to 2026-03-31
+
+Summary Metrics
+- Total work orders: 1,184
+- Closed within SLA: 1,096 (92.6%)
+- Average closure time: 2.9 days
+- Emergency interventions: 47
+
+Critical Events (Sample)
+1) 2024-06-18
+- Category: Plumbing
+- Location: Floor 6 riser shaft
+- Issue: Leak at valve flange
+- Action: Isolated line, replaced gasket, pressure tested
+- Downtime impact: 2 hours local supply interruption
+
+2) 2024-11-03
+- Category: Elevator
+- Location: Lift P3
+- Issue: Door sensor fault
+- Action: Sensor module replaced and recalibrated
+- Status: Closed same day
+
+3) 2025-02-12
+- Category: Fire safety
+- Location: Basement B1
+- Issue: Faulty detector loop segment
+- Action: Rewired 18m cable, tested panel
+- Status: Closed and verified
+
+4) 2025-08-29
+- Category: Waterproofing
+- Location: Roof north parapet
+- Issue: Seepage marks after heavy rain
+- Action: Temporary membrane patch, permanent repair planned
+- Status: Monitoring required
+
+5) 2026-01-21
+- Category: Electrical
+- Location: Main distribution board
+- Issue: Hotspot on breaker terminal
+- Action: Tightening, contact replacement, thermal retest
+- Status: Closed
+
+Preventive Maintenance Completion Rate
+- Elevators: 100%
+- Fire systems: 97%
+- Generator: 100%
+- Pumps: 95%
+- HVAC common areas: 93%
+
+Open Items at Report Date
+- Roof parapet permanent waterproofing intervention (planned Q3 2026)
+- Replacement of 6 emergency light batteries (planned April 2026)
+
+End of document.

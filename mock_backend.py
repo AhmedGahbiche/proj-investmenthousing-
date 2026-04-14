@@ -17,8 +17,11 @@ import io
 import textwrap
 import html
 import time
+import re
 from pathlib import Path
 from dotenv import load_dotenv
+from PyPDF2 import PdfReader
+import docx
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -38,11 +41,85 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
 OPENAI_TIMEOUT_SECONDS = int(os.getenv("OPENAI_TIMEOUT_SECONDS", "90"))
 OPENAI_MAX_RETRIES = int(os.getenv("OPENAI_MAX_RETRIES", "2"))
+ENABLE_MOCK_FALLBACK = os.getenv("ENABLE_MOCK_FALLBACK", "true").strip().lower() in {"1", "true", "yes", "on"}
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
 
 LAST_OPENAI_ERROR = ""
+
+REAL_ESTATE_TERMS = {
+    "property", "real estate", "building", "construction", "permit", "deed", "title deed",
+    "land", "plot", "apartment", "villa", "house", "mortgage", "lease", "rent", "tenant",
+    "zoning", "cadastre", "parcel", "valuation", "appraisal", "sqm", "m2", "floor", "permit",
+    "occupancy", "municipality", "tax certificate", "notary", "ownership", "registry",
+    # French terms common in Tunisian property files
+    "titre foncier", "acte de vente", "acte notarie", "permis de batir", "certificat",
+    "copropriete", "syndic", "lot", "immeuble", "appartement", "bail", "loyer",
+    "plan cadastral", "borne", "parcelle", "hypotheque", "mainlevee",
+    # Arabic transliteration commonly seen in mixed docs/filenames
+    "aqar", "milkia", "rasm a9ari", "baladiya", "rukhsa", "binaa", "kariba",
+}
+
+REAL_ESTATE_PATTERNS = [
+    r"\bpropert(y|ies)?\b",
+    r"\breal\s*estate\b",
+    r"\bbuild(ing|ings)?\b",
+    r"\bconstruct(ion|ive)?\b",
+    r"\bpermit(s)?\b",
+    r"\bdeed(s)?\b",
+    r"\btitle\b",
+    r"\bcadastr(al|e)?\b",
+    r"\bparcel(s)?\b",
+    r"\bzoning\b",
+    r"\boccupanc(y|ies)\b",
+    r"\blease(s|d)?\b",
+    r"\brent(al|s)?\b",
+    r"\btenant(s)?\b",
+    r"\bnotar(y|ie|ial)\b",
+    r"\bregistry\b",
+    r"\bhypothe(c|k)\w*\b",
+    r"\bimmeuble\b",
+    r"\bappartement\b",
+    r"\bpermis\s+de\s+batir\b",
+]
+
+OFF_TOPIC_TERMS = {
+    "recipe", "cooking", "football", "soccer", "movie", "music", "lyrics", "biology",
+    "chemistry", "vacation", "travel", "poem", "story", "novel", "game", "bitcoin",
+    "crypto", "fashion", "makeup", "diet", "workout", "phone review",
+}
+
+
+def _extract_text_for_mock(file_ext: str, file_name: str, content: bytes) -> tuple[str, str | None]:
+    """Best-effort extraction for mock mode to support relevance checks."""
+    try:
+        if file_ext == ".txt":
+            decoded = content.decode("utf-8", errors="ignore").strip()
+            return (decoded or f"Extracted text from {file_name}."), None
+
+        if file_ext == ".pdf":
+            reader = PdfReader(io.BytesIO(content))
+            extracted_pages = [(page.extract_text() or "") for page in reader.pages[:25]]
+            extracted = "\n".join(extracted_pages).strip()
+            if extracted:
+                return extracted, None
+            return f"No readable text extracted from {file_name} (possibly scanned PDF).", "empty_pdf_text"
+
+        if file_ext == ".docx":
+            parsed_doc = docx.Document(io.BytesIO(content))
+            extracted = "\n".join(p.text for p in parsed_doc.paragraphs).strip()
+            if extracted:
+                return extracted, None
+            return f"No readable text extracted from {file_name}.", "empty_docx_text"
+
+        # PNG fallback in mock mode when OCR stack is unavailable.
+        return f"Extracted text from {file_name}.", None
+    except Exception as exc:
+        return (
+            f"Extracted text from {file_name}. Detailed parser unavailable in mock mode.",
+            f"extraction_exception: {str(exc)[:180]}",
+        )
 
 # ============================================================================
 # FastAPI Application Setup
@@ -249,15 +326,15 @@ async def upload_document(file: UploadFile = File(...)):
         
         documents_db[doc_id] = doc
         
-        # Mock: Simulate text extraction
-        mock_text = f"Extracted text from {file.filename}. This is a mock extraction for demonstration purposes."
+        # Mock extraction now attempts real parsing for TXT/PDF/DOCX.
+        mock_text, extraction_error = _extract_text_for_mock(file_ext, file.filename, content)
         extracted_texts_db[doc_id] = {
             "id": doc_id,
             "document_id": doc_id,
             "raw_text": mock_text,
             "extraction_timestamp": datetime.now().isoformat(),
             "extraction_status": "success",
-            "extraction_error": None
+            "extraction_error": extraction_error
         }
         
         return UploadResponse(
@@ -416,6 +493,54 @@ def _extract_json_payload(content: str) -> dict | None:
         return None
 
 
+def _assess_real_estate_relevance(text: str) -> tuple[bool, float, str]:
+    """Heuristic relevance gate to block clearly off-topic files in mock mode."""
+    if not text or not text.strip():
+        return False, 0.0, "No readable document text was found"
+
+    normalized = re.sub(r"\s+", " ", text.lower()).strip()
+    term_hits = sum(1 for term in REAL_ESTATE_TERMS if term in normalized)
+    pattern_hits = sum(1 for pattern in REAL_ESTATE_PATTERNS if re.search(pattern, normalized))
+    real_estate_hits = max(term_hits, pattern_hits)
+    off_topic_hits = sum(1 for term in OFF_TOPIC_TERMS if term in normalized)
+
+    score = max(0.0, min(1.0, (real_estate_hits - off_topic_hits) / 6.0 + 0.5))
+
+    # Accept medium-high score even with sparse extraction (common for scanned/poor OCR PDFs).
+    if score >= 0.65 and off_topic_hits <= 1:
+        return True, score, "Likely relevant based on confidence score despite sparse text extraction"
+
+    if real_estate_hits >= 2 and score >= 0.55:
+        return True, score, "Relevant to property/building due diligence"
+
+    if off_topic_hits >= 2 and real_estate_hits == 0:
+        return False, score, "Document appears off-topic and unrelated to real-estate/building analysis"
+
+    return False, score, "Not enough real-estate evidence in the document to run a reliable analysis"
+
+
+def _assess_relevance_with_filenames(text: str, file_names: List[str]) -> tuple[bool, float, str]:
+    """Combine text signals with filename signals to reduce false negatives."""
+    base_ok, base_score, base_reason = _assess_real_estate_relevance(text)
+    if base_ok:
+        return base_ok, base_score, base_reason
+
+    names_blob = " ".join((name or "").lower() for name in file_names)
+    filename_hits = sum(1 for term in REAL_ESTATE_TERMS if term in names_blob)
+    off_topic_name_hits = sum(1 for term in OFF_TOPIC_TERMS if term in names_blob)
+
+    adjusted_score = max(0.0, min(1.0, base_score + (0.12 * filename_hits) - (0.15 * off_topic_name_hits)))
+
+    if filename_hits >= 2 and off_topic_name_hits == 0:
+        return True, adjusted_score, "Accepted based on strong real-estate filename evidence"
+
+    text_hits = sum(1 for term in REAL_ESTATE_TERMS if term in (text or "").lower())
+    if filename_hits >= 1 and text_hits >= 1 and off_topic_name_hits == 0:
+        return True, adjusted_score, "Accepted using combined text and filename relevance signal"
+
+    return False, adjusted_score, base_reason
+
+
 def analyze_with_openai(text: str) -> dict | None:
     """Call OpenAI API to analyze document text."""
     global LAST_OPENAI_ERROR
@@ -490,42 +615,109 @@ def analyze_with_openai(text: str) -> dict | None:
         return None
 
 
-def get_mock_analysis() -> dict:
-    """Return mock analysis when API fails"""
+def get_mock_analysis(source_text: str = "") -> dict:
+    """Return structured mock analysis when API fails, using document signals."""
+    text = (source_text or "").lower()
+
+    legal_terms = ["title", "deed", "permit", "occupancy", "registry", "notary", "tax", "cadastr"]
+    risk_terms = ["deficiency", "arrears", "leak", "seepage", "overdue", "fault", "complaint"]
+    valuation_terms = ["noi", "cap rate", "irr", "valuation", "income", "yield", "rent"]
+
+    legal_hits = sum(1 for t in legal_terms if t in text)
+    risk_hits = sum(1 for t in risk_terms if t in text)
+    valuation_hits = sum(1 for t in valuation_terms if t in text)
+
+    evidence_density = min(1.0, (legal_hits + valuation_hits + max(0, risk_hits - 1)) / 14.0)
+    legal_score = max(68, min(94, 72 + legal_hits * 3 - max(0, risk_hits - 2)))
+    # Cap raw risk-term penalty because mature dossiers naturally mention risk/compliance items.
+    risk_penalty = min(risk_hits, 4) * 3
+    risk_score = max(62, min(92, 84 - risk_penalty + min(valuation_hits, 2) + min(legal_hits, 2)))
+    valuation_score = max(62, min(93, 70 + valuation_hits * 4 + min(legal_hits, 2)))
+
+    if risk_score >= 80:
+        risk_level = "low"
+    elif risk_score >= 65:
+        risk_level = "medium"
+    else:
+        risk_level = "high"
+
+    if legal_score >= 80 and valuation_score >= 78 and risk_level != "high":
+        decision = "conditional_go"
+    elif risk_score < 58:
+        decision = "no_go"
+    else:
+        decision = "conditional_go"
+
+    top_issues = [
+        "Follow up on open maintenance and safety corrective actions",
+        "Validate tenant arrears recovery and lease enforcement",
+        "Complete valuation support pack with external market comps",
+    ]
+
+    next_actions = [
+        "Request signed copies of title, permit, and occupancy certificates",
+        "Obtain latest 12-month rent roll and arrears aging by unit",
+        "Commission targeted technical inspection for roof and fire systems",
+        "Reconcile NOI bridge against audited operating statements",
+    ]
+
     return {
         "legal_json": {
-            "risk_level": "low",
-            "summary": "Standard document with market-rate provisions.",
-            "flags": []
+            "score": legal_score,
+            "risk_level": "low" if legal_score >= 78 else "medium",
+            "document_validity": "valid" if legal_score >= 78 else "uncertain",
+            "summary": "Legal stack appears mostly complete with core title/permit evidence; perform final notarized reconciliation before investment committee sign-off.",
+            "flags": [
+                "Cross-verify current encumbrances against latest registry extract",
+                "Confirm all permit amendments are archived in final as-built file",
+            ],
         },
         "risk_json": {
-            "overall_risk_score": 2.5,
-            "risk_level": "low",
+            "score": risk_score,
+            "overall_risk_score": round((100 - risk_score) / 10, 1),
+            "risk_level": risk_level,
+            "summary": "Technical and operational risk is manageable with planned CAPEX and controls, subject to closure of outstanding compliance items.",
             "identified_risks": [
                 {
-                    "type": "standard",
-                    "description": "Standard market terms",
-                    "severity": "low"
-                }
-            ]
+                    "type": "operations",
+                    "description": "A limited set of maintenance/compliance actions remain open",
+                    "severity": "medium" if risk_level == "medium" else "low",
+                },
+                {
+                    "type": "income",
+                    "description": "Retail arrears and concentration should be monitored",
+                    "severity": "medium",
+                },
+            ],
         },
         "valuation_json": {
-            "estimated_value": 0,
-            "confidence_score": 0.0,
-            "valuation_method": "mock"
+            "score": valuation_score,
+            "estimated_value": "See valuation module and downloadable report",
+            "confidence_score": round(max(0.55, min(0.92, 0.58 + evidence_density * 0.32)), 2),
+            "price_fairness": "fair" if valuation_score >= 72 else "insufficient_data",
+            "summary": "Income profile and occupancy support a fair-value position, with upside linked to full lease-up and execution of planned CAPEX.",
+            "valuation_method": "mock-synthesis-income-and-risk",
         },
         "final_json": {
-            "overall_recommendation": "Proceed with standard due diligence follow-up.",
-            "decision": "conditional_go"
-        }
+            "overall_score": int(round((legal_score * 0.35) + (risk_score * 0.35) + (valuation_score * 0.30))),
+            "overall_risk": risk_level,
+            "go_no_go": decision,
+            "summary": "Professional preliminary due diligence indicates investable quality with conditional controls; close listed legal, technical, and lease-level actions before final approval.",
+            "overall_recommendation": "Proceed conditionally with a tracked close-out matrix and evidence refresh prior to execution.",
+            "decision": decision,
+            "top_issues": top_issues,
+            "next_actions": next_actions,
+        },
     }
 
 
 def analyze_with_llm(text: str) -> tuple[dict | None, str | None]:
-    """OpenAI-only analysis. Return analysis and source label."""
+    """Analyze with OpenAI; fall back to mock output when enabled."""
     openai_result = analyze_with_openai(text)
     if openai_result is not None:
         return openai_result, "openai"
+    if ENABLE_MOCK_FALLBACK:
+        return get_mock_analysis(text), "mock"
     return None, None
 
 
@@ -1021,14 +1213,27 @@ async def create_analysis(request: AnalyzeRequest):
     if not extracted_text:
         raise HTTPException(status_code=404, detail="No extracted text found")
     
-    # Call LLM API (OpenAI first, Claude fallback) to analyze the text
+    is_relevant, relevance_score, relevance_reason = _assess_relevance_with_filenames(
+        extracted_text.get("raw_text", ""),
+        [documents_db[document_id].get("filename", "")],
+    )
+    if not is_relevant:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Document rejected for property analysis. {relevance_reason}. "
+                f"Relevance score={relevance_score:.2f}."
+            ),
+        )
+
+    # Call LLM API to analyze the text (mock fallback can be enabled via env)
     text_to_analyze = extracted_text.get("raw_text", "")
     analysis_results, llm_source = analyze_with_llm(text_to_analyze)
     
     if analysis_results is None:
         raise HTTPException(
             status_code=502,
-            detail=f"OpenAI analysis failed. No fallback is enabled. Reason: {LAST_OPENAI_ERROR or 'unknown error'}",
+            detail=f"OpenAI analysis failed. Fallback is disabled. Reason: {LAST_OPENAI_ERROR or 'unknown error'}",
         )
     
     # Create analysis record
@@ -1087,11 +1292,26 @@ async def create_property_analysis(request: AnalyzePropertyRequest):
         raise HTTPException(status_code=404, detail="No extracted text found for the provided documents")
 
     combined_text = "\n\n".join(combined_text_parts)
+
+    file_names = [documents_db[doc_id].get("filename", "") for doc_id in request.document_ids]
+    is_relevant, relevance_score, relevance_reason = _assess_relevance_with_filenames(
+        combined_text,
+        file_names,
+    )
+    if not is_relevant:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Documents rejected for property analysis. {relevance_reason}. "
+                f"Relevance score={relevance_score:.2f}."
+            ),
+        )
+
     analysis_results, llm_source = analyze_with_llm(combined_text)
     if analysis_results is None:
         raise HTTPException(
             status_code=502,
-            detail=f"OpenAI analysis failed. No fallback is enabled. Reason: {LAST_OPENAI_ERROR or 'unknown error'}",
+            detail=f"OpenAI analysis failed. Fallback is disabled. Reason: {LAST_OPENAI_ERROR or 'unknown error'}",
         )
 
     analysis_id = next_analysis_id

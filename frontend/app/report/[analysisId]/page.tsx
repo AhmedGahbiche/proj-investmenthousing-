@@ -27,7 +27,7 @@ type AnalysisPayload = {
   };
 };
 
-function getNumericScore(value: unknown, fallback: number): number {
+function getNumericScore(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     return Math.max(0, Math.min(100, Math.round(value)));
   }
@@ -37,7 +37,7 @@ function getNumericScore(value: unknown, fallback: number): number {
       return Math.max(0, Math.min(100, Math.round(parsed)));
     }
   }
-  return fallback;
+  return null;
 }
 
 export default function PropertyReportPage() {
@@ -88,16 +88,22 @@ export default function PropertyReportPage() {
   const valuation = analysis?.outputs?.valuation_json || {};
   const final = analysis?.outputs?.final_json || {};
 
-  const legalScore = getNumericScore(legal.score ?? legal.confidence, 90);
-  const riskScore = getNumericScore(risk.score ?? risk.confidence, 84);
-  const valuationScore = getNumericScore(valuation.score ?? valuation.confidence, 88);
+  const legalScore = getNumericScore(legal.score ?? legal.confidence);
+  const riskScore = getNumericScore(risk.score ?? risk.confidence);
+  const valuationScore = getNumericScore(valuation.score ?? valuation.confidence);
 
   const overallRiskLabel = useMemo(() => {
     const riskLevel = String(final.risk_level || final.overall_risk || "").toLowerCase();
     if (riskLevel.includes("low")) return "Low";
     if (riskLevel.includes("high")) return "High";
-    return "Medium";
+    if (riskLevel.includes("medium")) return "Medium";
+    return "Unknown";
   }, [final]);
+
+  const legalBadge = String(legal.document_validity || legal.risk_level || legal.status || "unknown").replaceAll("_", " ");
+  const riskBadge = String(risk.risk_level || risk.status || "unknown").replaceAll("_", " ");
+  const valuationBadge = String(valuation.price_fairness || valuation.status || "unknown").replaceAll("_", " ");
+  const gradeLabel = String(final.go_no_go || final.decision || "unknown").replaceAll("_", " ");
 
   const summaryText = String(
     final.summary ||
@@ -144,7 +150,7 @@ export default function PropertyReportPage() {
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Risk Score</span>
                     </div>
                   </div>
-                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">Exemplary Grade</span>
+                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">{gradeLabel}</span>
                 </div>
               </div>
 
@@ -153,9 +159,9 @@ export default function PropertyReportPage() {
                   <div className="flex justify-between items-start mb-6">
                     <div>
                       <h3 className="text-lg font-bold text-blue-950 mb-1">Legal Analysis</h3>
-                      <span className="text-xs font-bold text-emerald-600 uppercase tracking-tighter">Approved</span>
+                      <span className="text-xs font-bold text-emerald-600 uppercase tracking-tighter">{legalBadge}</span>
                     </div>
-                    <div className="text-2xl font-black text-blue-950">{legalScore}<span className="text-sm font-medium text-slate-400">/100</span></div>
+                    <div className="text-2xl font-black text-blue-950">{legalScore ?? "N/A"}{legalScore !== null && <span className="text-sm font-medium text-slate-400">/100</span>}</div>
                   </div>
                   <div className="space-y-4 flex-grow">
                     <ul className="space-y-3">
@@ -171,9 +177,9 @@ export default function PropertyReportPage() {
                   <div className="flex justify-between items-start mb-6">
                     <div>
                       <h3 className="text-lg font-bold text-blue-950 mb-1">Risk Assessment</h3>
-                      <span className="text-xs font-bold text-emerald-600 uppercase tracking-tighter">Stable Market</span>
+                      <span className="text-xs font-bold text-emerald-600 uppercase tracking-tighter">{riskBadge}</span>
                     </div>
-                    <div className="text-2xl font-black text-blue-950">{riskScore}<span className="text-sm font-medium text-slate-400">/100</span></div>
+                    <div className="text-2xl font-black text-blue-950">{riskScore ?? "N/A"}{riskScore !== null && <span className="text-sm font-medium text-slate-400">/100</span>}</div>
                   </div>
                   <div className="space-y-4 flex-grow">
                     <ul className="space-y-3">
@@ -189,9 +195,9 @@ export default function PropertyReportPage() {
                   <div className="flex justify-between items-start mb-6">
                     <div>
                       <h3 className="text-lg font-bold text-blue-950 mb-1">Valuation</h3>
-                      <span className="text-xs font-bold text-amber-700 uppercase tracking-tighter">Gold Standard</span>
+                      <span className="text-xs font-bold text-amber-700 uppercase tracking-tighter">{valuationBadge}</span>
                     </div>
-                    <div className="text-2xl font-black text-blue-950">{valuationScore}<span className="text-sm font-medium text-slate-400">/100</span></div>
+                    <div className="text-2xl font-black text-blue-950">{valuationScore ?? "N/A"}{valuationScore !== null && <span className="text-sm font-medium text-slate-400">/100</span>}</div>
                   </div>
                   <div className="space-y-6 flex-grow">
                     <div className="bg-slate-100 p-4 rounded-xl">

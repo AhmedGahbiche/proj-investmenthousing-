@@ -1,0 +1,43 @@
+DOCUMENT: Title Deed and Ownership Chain Summary
+Document ID: ANR-BB-TITLE-2026-002
+Source Registry: Conservation de la Propriete Fonciere (synthetic extract)
+
+A) Registered Property Right
+- Title Number: TF-548921-TUNIS
+- Parcel Reference: TN-LM-118-04-2021
+- Location: La Marsa municipality, Sidi Daoud district
+- Registered Land Area: 3,420 m2
+- Primary Right: Freehold ownership
+
+B) Current Registered Owner
+- Entity: Nour Habitat Development SARL
+- Commercial Registry: B 241972016
+- Tax ID: TN-1658832-M
+- Registration Date of Current Ownership: 2019-11-28
+- Acquisition Basis: Notarized sale deed No. 1193/2019
+
+C) Ownership Chain (Last 3 Transfers)
+1. 2011-05-16: Tunis Coastal Holdings SA acquired from private consortium
+2. 2016-10-03: Parcel split and re-lotting under urban subdivision permit SUB-44-2016
+3. 2019-11-28: Nour Habitat Development SARL acquired current lot from Tunis Coastal Holdings SA
+
+D) Encumbrances and Charges
+- Mortgage Charge 1:
+  - Beneficiary: Banque de l'Habitat
+  - Initial Amount: 8,500,000 TND
+  - Registration Date: 2020-07-01
+  - Outstanding at 2026-02-28: 3,120,000 TND
+- Restrictive Covenant:
+  - Use condition: mixed-use residential/commercial only
+  - Height cap: R+8
+
+E) Litigation and Dispute Check
+- Court Search Date: 2026-03-02
+- Result: No active ownership dispute tied to title TF-548921-TUNIS
+- Enforcement Search: No seizure or attachment order registered as of search date
+
+F) Notary Notes
+- Deed references validated against cadastral map revision 2021-B
+- No mismatch identified between registered area and latest survey tolerance (+/-0.8%)
+
+End of document.

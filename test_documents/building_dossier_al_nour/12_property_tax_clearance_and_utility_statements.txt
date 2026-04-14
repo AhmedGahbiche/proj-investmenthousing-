@@ -1,0 +1,34 @@
+DOCUMENT: Property Tax Clearance and Utility Statements
+Document ID: ANR-BB-TAX-2026-012
+Reference Date: 2026-03-28
+
+A) Property Tax Status
+- Property Tax Account: TAX-LM-884219
+- Municipality: La Marsa
+- Tax Year 2025: settled in full
+- Tax Year 2026 (Q1 installment): settled on 2026-03-15
+- Outstanding penalties: none
+
+B) Utility Accounts
+Electricity Account: STEG-ACC-117732
+- Last 6-month average monthly bill: 31,900 TND
+- Past due amount: 0 TND
+- Supply status: active
+
+Water Account: SONEDE-ACC-904488
+- Last 6-month average monthly bill: 9,850 TND
+- Past due amount: 0 TND
+- Supply status: active
+
+Waste Collection Account: LM-WASTE-22871
+- Annual service fee status: paid through 2026-12-31
+
+C) Insurance and Public Dues
+- Building all-risk policy: active until 2026-12-20
+- Public liability policy: active until 2026-12-20
+- Civil defense annual fee: paid
+
+D) Clearance Conclusion
+No outstanding public dues or utility arrears were identified as of the reference date.
+
+End of document.

@@ -1,0 +1,35 @@
+DOCUMENT: MEP and Vertical Transport Inspection
+Document ID: ANR-BB-MEP-2026-008
+Inspector: Delta Technical Services (synthetic)
+Report Date: 2026-02-20
+
+A) Electrical Systems
+- Main incoming supply: 1.25 MVA
+- Backup generator: 500 kVA diesel genset
+- UPS for fire panel and critical controls: available
+- Earthing resistance measurement: 1.4 ohms (within target <2.0)
+- Thermal scan finding: minor hotspot at panel B2-L3 breaker (corrected)
+
+B) HVAC and Ventilation
+- Basement mechanical ventilation: operational, CO sensors calibrated
+- Corridor pressurization fans: functional
+- Common area split units: routine service completed 2026-01-27
+- Retail fresh-air balancing: 2 units below design by ~8% airflow (non-critical)
+
+C) Water and Plumbing
+- Domestic booster pumps: duty/standby arrangement functional
+- Roof tank disinfection certificates: current
+- Sewage ejector pumps: tested and operational
+- Leakage incidents last 12 months: 3 minor, all closed
+
+D) Elevators and Service Lift
+- Passenger elevators: 4 units (1,000 kg each)
+- Service lift: 1 unit (1,600 kg)
+- Last statutory lift inspection: 2026-01-16 - PASS
+- Mean downtime per lift (last quarter): 1.9 hours/month
+
+E) Overall MEP Condition
+- Status: Serviceable with minor maintenance actions
+- Immediate life-safety risk: none
+
+End of document.

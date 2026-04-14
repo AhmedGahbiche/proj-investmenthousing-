@@ -1,0 +1,37 @@
+DOCUMENT: Market Valuation and ROI Summary
+Document ID: ANR-BB-VAL-2026-013
+Valuation Date: 2026-03-25
+Valuation Firm: Meridian Valuers (synthetic)
+
+1) Valuation Approaches Used
+- Income capitalization approach
+- Discounted cash flow (10-year hold)
+- Market comparable cross-check
+
+2) Key Assumptions
+- Stabilized occupancy: 95%
+- Exit cap rate: 8.25%
+- Discount rate: 11.0%
+- Annual rental growth assumption: 3.0%
+- OPEX growth assumption: 3.5%
+
+3) Value Indications (TND)
+- Income capitalization value: 28,400,000
+- DCF value: 29,150,000
+- Market comparable adjusted value: 27,900,000
+- Reconciled market value: 28,500,000
+
+4) Yield Metrics
+- Year-1 NOI yield on value: 8.1%
+- Levered IRR (base case): 13.4%
+- Levered IRR (downside case): 10.1%
+
+5) Sensitivity (Value Impact)
+- Occupancy -5 pts: -1,450,000 TND
+- Cap rate +50 bps: -1,780,000 TND
+- OPEX +10%: -720,000 TND
+
+6) Valuation Opinion
+The asset is fairly valued within a moderate-risk income-producing residential/retail profile, with upside linked to full retail lease-up and energy efficiency upgrades.
+
+End of document.

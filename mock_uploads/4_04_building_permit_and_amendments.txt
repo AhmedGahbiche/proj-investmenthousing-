@@ -1,0 +1,36 @@
+DOCUMENT: Building Permit and Amendments Register
+Document ID: ANR-BB-PERMIT-2026-004
+Authority: Municipality of La Marsa - Urban Planning Department
+
+Permit Timeline
+- Initial Building Permit: BP-LM-2020-0618
+  - Issue Date: 2020-06-18
+  - Scope: Mixed-use building, R+8, 2 basement levels
+- Amendment 1: BP-LM-2020-0618-A1
+  - Date: 2021-02-09
+  - Scope: Basement ramp geometry and ventilation revision
+- Amendment 2: BP-LM-2020-0618-A2
+  - Date: 2021-07-21
+  - Scope: Façade material substitution and balcony guardrail specs
+- Amendment 3: BP-LM-2020-0618-A3
+  - Date: 2022-01-14
+  - Scope: Fire escape staircase pressurization update
+
+Approved Technical Parameters
+- Max Height Approved: 31 m
+- Floors Approved: B2 + B1 + G + 8
+- Parking Approved: 130 min spaces (actual delivered: 132)
+- Land Coverage Approved: <= 52% (actual: 49.1%)
+
+Permit Conditions
+1) Fire safety commissioning certificate required before occupancy
+2) Utility connection approvals (water/electricity/sewer) mandatory pre-handover
+3) Noise mitigation during operation for rooftop equipment
+4) Retail signage to follow municipal frontage code section 12
+
+Inspection Notes from Authority
+- 2021-04-13: Structural frame inspection passed
+- 2021-11-02: Façade anchoring correction requested and closed on 2021-11-18
+- 2022-04-30: Final compliance inspection passed with minor punch list
+
+End of document.

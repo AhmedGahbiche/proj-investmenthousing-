@@ -1,0 +1,64 @@
+DOCUMENT: Lease Roll and Commercial Terms (2026 Q1)
+Document ID: ANR-BB-LEASE-2026-010
+As Of Date: 2026-03-31
+
+Portfolio Occupancy
+- Residential: 91 / 96 units occupied (94.8%)
+- Retail: 7 / 8 units occupied (87.5%)
+
+A) Residential Leasing Snapshot
+- Average monthly rent: 2,480 TND per unit
+- Rent range: 1,350 TND to 4,900 TND
+- Security deposit standard: 2 months
+- Delinquency >30 days: 4 units
+- Delinquency >60 days: 1 unit
+
+B) Retail Leasing Snapshot
+Unit R1 - Pharmacy NourCare
+- Area: 92 m2
+- Base Rent: 6,400 TND/month
+- Lease Expiry: 2029-01-31
+
+Unit R2 - Cafe Cedars
+- Area: 110 m2
+- Base Rent: 7,200 TND/month
+- Lease Expiry: 2028-11-30
+- Arrears: 2.2 months
+
+Unit R3 - Mini Market Atlas
+- Area: 96 m2
+- Base Rent: 6,850 TND/month
+- Lease Expiry: 2030-05-31
+
+Unit R4 - Optical Store Vision Plus
+- Area: 74 m2
+- Base Rent: 5,200 TND/month
+- Lease Expiry: 2027-08-31
+
+Unit R5 - Vacant
+- Area: 82 m2
+- Asking Rent: 5,750 TND/month
+
+Unit R6 - Laundry Express
+- Area: 68 m2
+- Base Rent: 4,700 TND/month
+- Lease Expiry: 2028-03-31
+
+Unit R7 - Mobile Hub
+- Area: 77 m2
+- Base Rent: 5,050 TND/month
+- Lease Expiry: 2027-12-31
+
+Unit R8 - Dental Clinic Annexe
+- Area: 89 m2
+- Base Rent: 6,150 TND/month
+- Lease Expiry: 2031-06-30
+- Arrears: 1.1 months
+
+C) Key Commercial Clauses
+- Annual indexation: CPI-linked, floor 2%, cap 6%
+- Service charge reconciliation: annual true-up
+- Late payment penalty: 0.75% monthly on overdue balances
+- Assignment/subletting: landlord consent required
+
+End of document.

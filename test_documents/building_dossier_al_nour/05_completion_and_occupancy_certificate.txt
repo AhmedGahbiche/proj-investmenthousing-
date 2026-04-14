@@ -1,0 +1,35 @@
+DOCUMENT: Completion and Occupancy Certificate
+Document ID: ANR-BB-OCC-2026-005
+Issuing Authority: Municipality of La Marsa
+
+A) Practical Completion
+- Certificate Number: PC-LM-2022-0441
+- Date Issued: 2022-04-22
+- Contractor: Maghreb Build Contracting SA
+- Consultant Engineer: Yasmine Engineering Office
+- Scope Completed: Civil, architectural, MEP, life safety systems
+
+B) Occupancy Authorization
+- Certificate Number: OCC-LM-2022-0512
+- Date Issued: 2022-05-12
+- Permitted Use: Residential and neighborhood retail
+- Occupancy Cap: 468 persons total load (design basis)
+
+C) Conditions at Occupancy Approval
+- Fire detection and alarm tested: PASS
+- Emergency lighting tested: PASS
+- Lift certification submitted: PASS
+- Potable water quality report filed: PASS
+- As-built drawings archived with authority: PASS
+
+D) Defect Liability and Warranty Periods
+- General defects liability: 24 months (ended 2024-05-11)
+- Waterproofing system warranty: 10 years (until 2032-05-11)
+- Elevators maintenance warranty: 5 years (until 2027-05-11)
+- Fire alarm panel warranty: 3 years (ended 2025-05-11)
+
+E) Outstanding Non-Critical Items at Handover
+- Landscape soft-scape completion delayed by 6 weeks (closed 2022-07-03)
+- Basement wayfinding signage update requested (closed 2022-06-18)
+
+End of document.

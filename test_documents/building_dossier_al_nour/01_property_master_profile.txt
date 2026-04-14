@@ -1,0 +1,56 @@
+DOCUMENT: Property Master Profile
+Document ID: ANR-BB-PROFILE-2026-001
+Issue Date: 2026-03-15
+Prepared By: Noor Asset Advisory (synthetic)
+
+1) Asset Identity
+- Property Name: Al Nour Residence - Block B
+- Address: Lot 118, Avenue de l'Urbanisme, Sidi Daoud, La Marsa, Tunis
+- Cadastral Parcel Ref: TN-LM-118-04-2021
+- Building Use: Residential + Ground-floor retail
+- Legal Owner: Nour Habitat Development SARL
+- Tax Registration (Owner): TN-1658832-M
+
+2) Physical Characteristics
+- Plot Area: 3,420 m2
+- Gross Built Area (GBA): 14,870 m2
+- Net Leasable Area (NLA): 11,940 m2
+- Floors: B2, B1, Ground, 1-8, technical roof
+- Residential Units: 96 apartments
+- Retail Units: 8 shops (Ground floor)
+- Parking: 132 car spaces, 24 motorcycle spaces
+- Elevators: 4 passenger lifts + 1 service lift
+
+3) Construction & Handover Milestones
+- Permit Issue: 2020-06-18
+- Main Structural Completion: 2021-12-09
+- MEP Commissioning: 2022-03-27
+- Occupancy Certificate: 2022-05-12
+- Operational Start: 2022-06-01
+
+4) Unit Mix
+- Studio: 18 units, avg 49 m2
+- 1-bedroom: 34 units, avg 67 m2
+- 2-bedroom: 31 units, avg 92 m2
+- 3-bedroom: 13 units, avg 128 m2
+- Retail (ground): 8 units, avg 86 m2
+
+5) Current Operational Snapshot (2026-Q1)
+- Residential Occupancy: 94.8%
+- Retail Occupancy: 87.5%
+- Weighted Average Lease Term (WALT): 2.8 years
+- Annual Gross Scheduled Income: 4,182,000 TND
+- Service Charge Budget: 38.5 TND/m2/year
+
+6) Noted Risk Flags
+- 2 retail tenants with rent arrears > 60 days
+- Roof waterproofing intervention scheduled in Q3 2026
+- Fire panel battery replacement due by 2026-08-31
+
+7) Due Diligence Summary
+- Legal documentation: complete set available
+- Construction and occupancy permits: available and cross-referenced
+- Technical condition: generally good, no critical structural findings
+- Environmental status: no major contamination indicators
+
+End of document.

@@ -1,0 +1,33 @@
+DOCUMENT: Environmental and HSE Assessment
+Document ID: ANR-BB-ENV-2026-009
+Consultant: GreenTrack Advisory (synthetic)
+Assessment Date: 2026-03-04
+
+1) Site and Context
+- Urban infill development, no adjacent heavy industrial land use
+- Historical land use review: low contamination likelihood
+
+2) Environmental Checks
+- Indoor air spot checks (common areas): acceptable range
+- Potable water sample testing: compliant with municipal limits
+- Waste segregation program: active for plastic, paper, and mixed waste
+- Hazardous waste register: none identified beyond routine battery disposal
+
+3) Noise and Community Impact
+- Peak rooftop equipment noise at boundary: 52 dBA (night threshold 55 dBA)
+- Complaint log (last 12 months): 4 noise complaints, all resolved
+
+4) Health and Safety Management
+- Contractor permit-to-work process: in place
+- Incident recordable rate (2025): 0.8 per 200k hours (low)
+- First-aid and emergency response training: quarterly schedule maintained
+
+5) ESG Notes
+- LED retrofit completion: 96% of common areas
+- Annual electricity intensity estimate: 82 kWh/m2/year (common services)
+- Water-saving fixtures coverage: 88% of units
+
+6) Conclusion
+No major environmental liabilities were detected in this screening-level review. Continue preventive maintenance and annual compliance monitoring.
+
+End of document.
