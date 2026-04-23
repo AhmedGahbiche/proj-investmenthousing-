@@ -1,18 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 import { authCookieName, createSession } from "@/lib/auth";
 
-const users = {
-  admin: {
-    email: process.env.ADMIN_EMAIL || "admin@taqim.tn",
-    password: process.env.ADMIN_PASSWORD || "Admin#2026",
-  },
-  client: {
-    email: process.env.CLIENT_EMAIL || "client@taqim.tn",
-    password: process.env.CLIENT_PASSWORD || "Client#2026",
-  },
-};
+function safeEqual(left: string, right: string): boolean {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  if (leftBuffer.length !== rightBuffer.length) {
+    return false;
+  }
+  return timingSafeEqual(leftBuffer, rightBuffer);
+}
 
 export async function POST(req: NextRequest) {
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  const clientEmail = process.env.CLIENT_EMAIL;
+  const clientPassword = process.env.CLIENT_PASSWORD;
+
+  if (!adminEmail || !adminPassword || !clientEmail || !clientPassword) {
+    return NextResponse.json(
+      { error: "Authentication is not configured on the server" },
+      { status: 500 }
+    );
+  }
+
   const body = await req.json().catch(() => null);
   if (!body?.email || !body?.password) {
     return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
@@ -22,8 +33,8 @@ export async function POST(req: NextRequest) {
   const password = String(body.password);
 
   let role: "admin" | "client" | null = null;
-  if (email === users.admin.email.toLowerCase() && password === users.admin.password) role = "admin";
-  if (email === users.client.email.toLowerCase() && password === users.client.password) role = "client";
+  if (safeEqual(email, adminEmail.toLowerCase()) && safeEqual(password, adminPassword)) role = "admin";
+  if (safeEqual(email, clientEmail.toLowerCase()) && safeEqual(password, clientPassword)) role = "client";
 
   if (!role) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });

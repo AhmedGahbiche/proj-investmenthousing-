@@ -9,7 +9,8 @@ from pathlib import Path
 # Add parent to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-def test_imports():
+
+def _check_imports() -> bool:
     """Test that all main modules can be imported."""
     print("Testing imports...")
     try:
@@ -42,7 +43,12 @@ def test_imports():
         print(f"❌ Import failed: {e}")
         return False
 
-def test_vector_service():
+
+def test_imports() -> None:
+    assert _check_imports()
+
+
+def _check_vector_service() -> bool:
     """Test vector service basic functionality."""
     print("\nTesting vector service...")
     try:
@@ -83,7 +89,12 @@ def test_vector_service():
         traceback.print_exc()
         return False
 
-def test_vector_index():
+
+def test_vector_service() -> None:
+    assert _check_vector_service()
+
+
+def _check_vector_index() -> bool:
     """Test vector index manager."""
     print("\nTesting vector index manager...")
     try:
@@ -129,7 +140,12 @@ def test_vector_index():
         traceback.print_exc()
         return False
 
-def test_file_storage():
+
+def test_vector_index() -> None:
+    assert _check_vector_index()
+
+
+def _check_file_storage() -> bool:
     """Test file storage functionality."""
     print("\nTesting file storage...")
     try:
@@ -154,7 +170,12 @@ def test_file_storage():
         print(f"❌ File storage test failed: {e}")
         return False
 
-def test_text_extraction():
+
+def test_file_storage() -> None:
+    assert _check_file_storage()
+
+
+def _check_text_extraction() -> bool:
     """Test text extraction service."""
     print("\nTesting text extraction...")
     try:
@@ -185,6 +206,10 @@ def test_text_extraction():
         traceback.print_exc()
         return False
 
+
+def test_text_extraction() -> None:
+    assert _check_text_extraction()
+
 def main():
     """Run all tests."""
     print("=" * 60)
@@ -192,11 +217,11 @@ def main():
     print("=" * 60)
     
     tests = [
-        ("Module Imports", test_imports),
-        ("File Storage", test_file_storage),
-        ("Text Extraction", test_text_extraction),
-        ("Vector Service", test_vector_service),
-        ("Vector Index Manager", test_vector_index),
+        ("Module Imports", _check_imports),
+        ("File Storage", _check_file_storage),
+        ("Text Extraction", _check_text_extraction),
+        ("Vector Service", _check_vector_service),
+        ("Vector Index Manager", _check_vector_index),
     ]
     
     results = []

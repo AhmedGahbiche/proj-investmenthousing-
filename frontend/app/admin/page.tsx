@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import SharedNavbar from "@/components/SharedNavbar";
+import { fetchBackendJson } from "@/lib/backendApi";
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
@@ -11,8 +12,8 @@ export default function AdminDashboard() {
   const [documents, setDocuments] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch(`${BACKEND}/system/status`).then((r) => r.json()).then(setSystem).catch(() => setSystem({ status: "unreachable" }));
-    fetch(`${BACKEND}/documents?limit=20&offset=0`).then((r) => r.json()).then(setDocuments).catch(() => setDocuments([]));
+    fetchBackendJson<any>(`${BACKEND}/system/status`).then(setSystem).catch(() => setSystem({ status: "unreachable" }));
+    fetchBackendJson<any[]>(`${BACKEND}/documents?limit=20&offset=0`).then(setDocuments).catch(() => setDocuments([]));
   }, []);
 
   return (

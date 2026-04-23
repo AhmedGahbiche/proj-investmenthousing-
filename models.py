@@ -3,8 +3,8 @@ Database models for document management service.
 """
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Index, JSON
-from sqlalchemy.ext.declarative import declarative_base
-from pydantic import BaseModel, Field
+from sqlalchemy.orm import declarative_base
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 
 # SQLAlchemy ORM Base
@@ -82,8 +82,7 @@ class DocumentResponse(BaseModel):
     document_type: Optional[str] = None
     property_id: Optional[str] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ExtractedTextResponse(BaseModel):
@@ -94,8 +93,7 @@ class ExtractedTextResponse(BaseModel):
     extraction_timestamp: datetime
     extraction_status: str
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DocumentWithTextResponse(BaseModel):
@@ -103,8 +101,7 @@ class DocumentWithTextResponse(BaseModel):
     document: DocumentResponse
     extracted_text: Optional[ExtractedTextResponse] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UploadResponse(BaseModel):
@@ -206,8 +203,7 @@ class VectorEmbeddingResponse(BaseModel):
     chunk_overlap: int
     embedding_timestamp: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SearchResult(BaseModel):
@@ -241,6 +237,21 @@ class AnalyzeCreateResponse(BaseModel):
     document_id: int
     status: str
     task_id: Optional[str] = None
+
+
+class AnalyzePropertyRequest(BaseModel):
+    """Schema for creating an analysis task across multiple documents."""
+    document_ids: List[int]
+    property_name: Optional[str] = None
+
+
+class AnalyzePropertyCreateResponse(BaseModel):
+    """Schema for property-level analysis creation response."""
+    success: bool
+    analysis_id: int
+    document_ids: List[int]
+    status: str
+    report_url: str
 
 
 class AnalysisOutputResponse(BaseModel):

@@ -2,6 +2,11 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import TopNav from "@/components/TopNav";
+import {
+  startPropertyAnalysisRequest,
+  uploadDocuments,
+  type UploadedDocument,
+} from "@/lib/analysisApi";
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
@@ -41,7 +46,7 @@ function normalizeOutputs(outputs: AnalysisData["outputs"]): NormalizedOutput[] 
 
 export default function ClientDashboard() {
   const [files, setFiles] = useState<File[]>([]);
-  const [uploadedDocuments, setUploadedDocuments] = useState<Array<{ document_id: number; filename: string }>>([]);
+  const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocument[]>([]);
   const [documentId, setDocumentId] = useState<number | null>(null);
   const [analysisId, setAnalysisId] = useState<string>("");
   const [analysis, setAnalysis] = useState<AnalysisData | null>(null);
@@ -77,26 +82,7 @@ export default function ClientDashboard() {
     setError("");
 
     try {
-      const successes: Array<{ document_id: number; filename: string }> = [];
-      const failures: string[] = [];
-
-      for (const file of files) {
-        const form = new FormData();
-        form.append("file", file);
-
-        const res = await fetch(`${BACKEND}/upload`, { method: "POST", body: form });
-        const data = await res.json();
-
-        if (!res.ok) {
-          failures.push(`${file.name}: ${data.detail || "Upload failed"}`);
-          continue;
-        }
-
-        successes.push({
-          document_id: data.document_id,
-          filename: data.filename || file.name,
-        });
-      }
+      const { successes, failures } = await uploadDocuments(BACKEND, files);
 
       if (successes.length > 0) {
         setUploadedDocuments((prev) => [...prev, ...successes]);
@@ -121,13 +107,14 @@ export default function ClientDashboard() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ document_id: documentId }),
+      credentials: "include",
     });
 
     const data = await res.json();
     setBusy(false);
 
     if (!res.ok) {
-      setError(data.detail || "Analysis start failed");
+      setError(data.detail || data.error || "Analysis start failed");
       return;
     }
 
@@ -143,29 +130,28 @@ export default function ClientDashboard() {
     setBusy(true);
     setError("");
 
-    const res = await fetch(`${BACKEND}/analyze/property`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ document_ids: uploadedDocuments.map((d) => d.document_id) }),
-    });
+    try {
+      const result = await startPropertyAnalysisRequest(BACKEND, {
+        document_ids: uploadedDocuments.map((d) => d.document_id),
+      });
 
-    const data = await res.json();
-    setBusy(false);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
 
-    if (!res.ok) {
-      setError(data.detail || "Property analysis failed");
-      return;
+      setAnalysisId(result.data.analysis_id);
+      setReportUrl(result.data.report_url || "");
+      setReportText("");
+      setAnalysis(null);
+    } finally {
+      setBusy(false);
     }
-
-    setAnalysisId(data.analysis_id);
-    setReportUrl(data.report_url || "");
-    setReportText("");
-    setAnalysis(null);
   }
 
   async function loadPlainTextReport(reportPath: string) {
     const txtPath = reportPath.replace(/\/html$/, "/txt");
-    const res = await fetch(`${BACKEND}${txtPath}`);
+    const res = await fetch(`${BACKEND}${txtPath}`, { credentials: "include" });
     if (!res.ok) {
       setError("Report was generated but plain-text version could not be loaded");
       return;
@@ -179,11 +165,11 @@ export default function ClientDashboard() {
 
     let timer: NodeJS.Timeout;
     const poll = async () => {
-      const res = await fetch(`${BACKEND}/analyze/${analysisId}`);
+      const res = await fetch(`${BACKEND}/analyze/${analysisId}`, { credentials: "include" });
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.detail || "Failed to fetch analysis status");
+        setError(data.detail || data.error || "Failed to fetch analysis status");
         return;
       }
 

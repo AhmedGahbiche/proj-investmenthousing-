@@ -2,7 +2,7 @@
 Configuration settings for the document management service.
 """
 from pathlib import Path
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
 
@@ -26,9 +26,23 @@ class Settings(BaseSettings):
     LOG_DIR: str = "./logs"
     LOG_LEVEL: str = "INFO"
 
+    # Authentication / Authorization Settings
+    AUTH_SECRET: str = ""
+    AUTH_COOKIE_NAME: str = "taqim_session"
+    AUTH_REQUIRED: bool = True
+    CLIENT_ALLOWED_PROPERTY_IDS: str = ""
+
     # Async Analysis Settings
     CELERY_BROKER_URL: str = "redis://redis:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://redis:6379/1"
+    ANALYSIS_MODULE_TIMEOUT_SECONDS: int = 90
+
+    # Performance / Runtime Safety
+    VECTOR_INDEX_MAX_LOADED_INDICES: int = 64
+    VECTOR_SEARCH_PREFILTER_MIN_DOCS: int = 16
+    VECTOR_SEARCH_PREFILTER_MULTIPLIER: int = 4
+    VECTOR_SEARCH_PREFILTER_MIN_CANDIDATES: int = 20
+    SKIP_DEPENDENCY_CHECK: bool = False
 
     # OpenAI Analysis Settings
     OPENAI_API_KEY: str = ""
@@ -37,9 +51,10 @@ class Settings(BaseSettings):
     OPENAI_TIMEOUT_SECONDS: int = 120
     ANTHROPIC_API_KEY: Optional[str] = ""
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+    )
 
 
 # Create global settings instance

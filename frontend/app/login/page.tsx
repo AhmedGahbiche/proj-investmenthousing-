@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("client@taqim.tn");
-  const [password, setPassword] = useState("Client#2026");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -76,6 +76,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
+                  placeholder="you@company.com"
                 />
               </label>
 
@@ -87,6 +88,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="current-password"
+                  placeholder="Enter your password"
                 />
               </label>
 
@@ -101,8 +103,7 @@ export default function LoginPage() {
             </form>
 
             <div className="mt-6 pt-5 border-t border-slate-200 text-xs text-slate-500 space-y-1.5">
-              <p><span className="font-bold text-blue-900">Demo admin:</span> admin@taqim.tn / Admin#2026</p>
-              <p><span className="font-bold text-blue-900">Demo client:</span> client@taqim.tn / Client#2026</p>
+              <p>Credentials are provided via secured environment variables.</p>
               <p>
                 Need an account? <Link className="font-bold text-blue-900" href="/signup">Sign up</Link>
               </p>

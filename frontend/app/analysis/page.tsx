@@ -3,13 +3,18 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import SharedNavbar from "@/components/SharedNavbar";
+import {
+  startPropertyAnalysisRequest,
+  uploadDocuments,
+  type UploadedDocument,
+} from "@/lib/analysisApi";
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
 export default function NewAnalysisPage() {
   const router = useRouter();
   const [files, setFiles] = useState<File[]>([]);
-  const [uploadedDocuments, setUploadedDocuments] = useState<Array<{ document_id: number; filename: string }>>([]);
+  const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocument[]>([]);
   const [propertyAddress, setPropertyAddress] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -24,26 +29,7 @@ export default function NewAnalysisPage() {
     setSuccess("");
 
     try {
-      const successes: Array<{ document_id: number; filename: string }> = [];
-      const failures: string[] = [];
-
-      for (const file of files) {
-        const form = new FormData();
-        form.append("file", file);
-
-        const res = await fetch(`${BACKEND}/upload`, { method: "POST", body: form });
-        const data = await res.json();
-
-        if (!res.ok) {
-          failures.push(`${file.name}: ${data.detail || "Upload failed"}`);
-          continue;
-        }
-
-        successes.push({
-          document_id: data.document_id,
-          filename: data.filename || file.name,
-        });
-      }
+      const { successes, failures } = await uploadDocuments(BACKEND, files);
 
       if (successes.length > 0) {
         setUploadedDocuments((prev) => [...prev, ...successes]);
@@ -66,24 +52,21 @@ export default function NewAnalysisPage() {
     setError("");
     setSuccess("");
 
-    const res = await fetch(`${BACKEND}/analyze/property`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    try {
+      const result = await startPropertyAnalysisRequest(BACKEND, {
         document_ids: uploadedDocuments.map((d) => d.document_id),
         property_name: propertyAddress || "Property Portfolio",
-      }),
-    });
+      });
 
-    const data = await res.json();
-    setBusy(false);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
 
-    if (!res.ok) {
-      setError(data.detail || "Property analysis failed");
-      return;
+      router.push(`/report/${result.data.analysis_id}`);
+    } finally {
+      setBusy(false);
     }
-
-    router.push(`/report/${data.analysis_id}`);
   }
 
   return (

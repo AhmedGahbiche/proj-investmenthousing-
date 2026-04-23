@@ -4,6 +4,8 @@ Handles document and extracted text persistence.
 """
 import logging
 from datetime import datetime
+from threading import Lock
+from typing import Optional
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from config import settings
@@ -18,6 +20,10 @@ from models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+_db_service_instance: Optional["DatabaseService"] = None
+_db_service_lock = Lock()
 
 
 class DatabaseService:
@@ -339,7 +345,7 @@ class DatabaseService:
 
         Args:
             analysis_id: Analysis ID
-            status: New status (queued, processing, done, failed)
+            status: New status (queued, processing, completed, failed)
             error: Optional error message
             started_at: Optional start timestamp override
             finished_at: Optional finish timestamp override
@@ -363,7 +369,7 @@ class DatabaseService:
 
             if finished_at:
                 analysis.finished_at = finished_at
-            elif status in ("done", "failed"):
+            elif status in ("done", "completed", "failed"):
                 analysis.finished_at = datetime.utcnow()
 
             session.commit()
@@ -482,5 +488,22 @@ class DatabaseService:
             session.close()
 
 
-# Global database service instance
-db_service = DatabaseService()
+def get_db_service() -> "DatabaseService":
+    """Return a lazily initialized singleton database service instance."""
+    global _db_service_instance
+    if _db_service_instance is None:
+        with _db_service_lock:
+            if _db_service_instance is None:
+                _db_service_instance = DatabaseService()
+    return _db_service_instance
+
+
+class _LazyDatabaseServiceProxy:
+    """Compatibility proxy to keep existing `db_service.*` call sites unchanged."""
+
+    def __getattr__(self, name):
+        return getattr(get_db_service(), name)
+
+
+# Lazy database service proxy (keeps import API stable)
+db_service = _LazyDatabaseServiceProxy()

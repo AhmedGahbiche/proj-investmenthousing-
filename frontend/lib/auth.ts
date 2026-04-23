@@ -9,11 +9,19 @@ export interface SessionPayload extends JWTPayload {
 }
 
 const COOKIE_NAME = "taqim_session";
-const secret = new TextEncoder().encode(process.env.AUTH_SECRET || "dev-secret-change-me");
+
+function getAuthSecret(): Uint8Array {
+  const rawSecret = process.env.AUTH_SECRET;
+  if (!rawSecret || rawSecret.trim().length < 16) {
+    throw new Error("AUTH_SECRET must be set and at least 16 characters long");
+  }
+  return new TextEncoder().encode(rawSecret);
+}
 
 export const authCookieName = COOKIE_NAME;
 
 export async function createSession(payload: SessionPayload): Promise<string> {
+  const secret = getAuthSecret();
   return new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -23,6 +31,7 @@ export async function createSession(payload: SessionPayload): Promise<string> {
 
 export async function verifySession(token: string): Promise<SessionPayload | null> {
   try {
+    const secret = getAuthSecret();
     const { payload } = await jwtVerify(token, secret);
     return {
       sub: String(payload.sub || ""),

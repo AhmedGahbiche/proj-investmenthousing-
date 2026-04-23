@@ -1,0 +1,96 @@
+name: License Compliance
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  license-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Backend Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pip-licenses cyclonedx-bom
+
+      - name: Generate Backend License Report
+        run: |
+          pip-licenses --format=json --output-file backend-licenses.json
+          cyclonedx-py requirements -i requirements.txt -o backend-sbom.json --format json
+
+      - name: Validate Backend Licenses
+        run: |
+          python - <<'PY'
+          import json
+          forbidden = ("GPL", "AGPL", "SSPL")
+          with open("backend-licenses.json", "r", encoding="utf-8") as f:
+              rows = json.load(f)
+          offenders = []
+          for row in rows:
+              license_name = str(row.get("License", ""))
+              package_name = str(row.get("Name", ""))
+              if any(token in license_name.upper() for token in forbidden):
+                  offenders.append((package_name, license_name))
+          if offenders:
+              print("Forbidden backend licenses detected:")
+              for pkg, license_name in offenders:
+                  print(f"- {pkg}: {license_name}")
+              raise SystemExit(1)
+          print("Backend license policy check passed")
+          PY
+
+      - name: Install Frontend Dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Generate Frontend License Report
+        run: |
+          cd frontend
+          npx license-checker --json --production > ../frontend-licenses.json
+          npx @cyclonedx/cyclonedx-npm --output-file ../frontend-sbom.json
+
+      - name: Validate Frontend Licenses
+        run: |
+          python - <<'PY'
+          import json
+          forbidden = ("GPL", "AGPL", "SSPL")
+          with open("frontend-licenses.json", "r", encoding="utf-8") as f:
+              rows = json.load(f)
+          offenders = []
+          for package_key, row in rows.items():
+              license_name = str(row.get("licenses", ""))
+              if any(token in license_name.upper() for token in forbidden):
+                  offenders.append((package_key, license_name))
+          if offenders:
+              print("Forbidden frontend licenses detected:")
+              for pkg, license_name in offenders:
+                  print(f"- {pkg}: {license_name}")
+              raise SystemExit(1)
+          print("Frontend license policy check passed")
+          PY
+
+      - name: Upload License and SBOM Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-artifacts
+          path: |
+            backend-licenses.json
+            backend-sbom.json
+            frontend-licenses.json
+            frontend-sbom.json

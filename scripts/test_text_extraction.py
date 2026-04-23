@@ -15,7 +15,7 @@ from services.text_extraction import text_extraction
 from services.text_validator import text_validator
 
 
-class TestDocumentSamples:
+class DocumentSampleTests:
     """Test extraction with real and synthetic documents."""
     
     def __init__(self):
@@ -358,6 +358,6 @@ Confidence Level: High"""
 
 
 if __name__ == "__main__":
-    test_suite = TestDocumentSamples()
+    test_suite = DocumentSampleTests()
     success = test_suite.run_all_tests()
     sys.exit(0 if success else 1)

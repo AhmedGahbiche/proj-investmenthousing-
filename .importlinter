@@ -1,0 +1,19 @@
+[importlinter]
+root_package = services
+
+[importlinter:contract:service_layers]
+name = Service architecture layers remain acyclic and directional
+type = layers
+layers =
+    services.analysis_tasks
+    services.upload_service
+    services.regulation_retrieval
+    services.text_extraction
+    services.vector_service
+    services.analysis_intelligence
+    services.database
+    services.file_storage
+    services.vector_index
+    services.text_validator
+    services.report_generator
+    services.dependency_checker

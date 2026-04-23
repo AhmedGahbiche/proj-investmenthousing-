@@ -109,6 +109,29 @@ The diagram source file is available at [docs/architecture.svg](docs/architectur
 - `GET /analyze/{analysis_id}`
   - Returns status and outputs (when available)
 
+### Reports
+
+- `POST /reports/{analysis_id}`
+- `GET /reports/{analysis_id}/html`
+- `GET /reports/{analysis_id}/txt`
+- `GET /reports/{analysis_id}/pdf`
+
+## 5.1 Frontend/Backend Contract Matrix
+
+Frontend pages are expected to call the production backend (`main.py`) unless explicitly running a mock flow.
+
+| Frontend flow | Route used | Production backend support |
+|---|---|---|
+| Upload document | `POST /upload` | Yes |
+| Start single-doc analysis | `POST /analyze` | Yes |
+| Start property analysis | `POST /analyze/property` | Yes |
+| Poll analysis status | `GET /analyze/{analysis_id}` | Yes |
+| HTML report | `GET /reports/{analysis_id}/html` | Yes |
+| TXT report | `GET /reports/{analysis_id}/txt` | Yes |
+| PDF report | `GET /reports/{analysis_id}/pdf` | Yes |
+
+If you run the frontend against `mock_backend.py`, behavior can differ from production and should only be used for isolated UI prototyping.
+
 ## 6. Analysis intelligence layer (implemented)
 
 The worker now uses real OpenAI calls (not placeholder heuristics):
@@ -174,6 +197,21 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 celery -A worker.celery_app worker --loglevel=info
 ```
 
+## 9.1 Frontend Local Run (Recommended)
+
+1. Create frontend env file from `frontend/.env.example`.
+2. Set `NEXT_PUBLIC_BACKEND_URL` to `http://localhost:8000`.
+3. Ensure `AUTH_SECRET` matches backend `.env` value.
+4. Start frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Use the production backend (`main.py`) for end-to-end verification. Keep `mock_backend.py` only for controlled mock-only UI checks.
+
 ## 10. Example requests
 
 ### Upload document
@@ -209,17 +247,18 @@ curl "http://localhost:8000/analyze/1"
 - Async analysis orchestration with Celery
 - OpenAI-backed analysis intelligence layer
 - Status tracking and output retrieval endpoints
+- Report generation and download endpoints (HTML/TXT/PDF)
+- Authentication and authorization on protected routes (JWT, admin role gate, and property ownership checks)
 
 ### Pending
 
-- PDF report generation endpoint
 - User notification on analysis completion
-- Authentication/authorization (JWT, ownership checks)
 - Regulation corpus ingestion API (service exists, endpoint not added yet)
 - Stronger schema validation/guardrails for model outputs
 
 ## 12. Notes
 
 - Keep API keys in `.env` only; do not commit secrets.
+- Configure `CLIENT_ALLOWED_PROPERTY_IDS` in `.env` to scope client-role access by property.
 - Ensure regulation corpus is indexed in `regulation_indices` for meaningful retrieval context.
 - For production, add observability, rate limits, auth, and stricter validation before enabling public traffic.

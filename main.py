@@ -4,11 +4,17 @@ Provides REST endpoints for document upload, retrieval, and text extraction.
 """
 import logging
 import json
+from typing import Any, Dict, Optional
+from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
-from fastapi import FastAPI, File, UploadFile, HTTPException, Query
+from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
+import jwt
+from jwt import InvalidTokenError
+from sqlalchemy.exc import SQLAlchemyError
+from services.file_storage import FileStorageError
 
 from config import settings
 from models import (
@@ -20,15 +26,19 @@ from models import (
     SearchResult,
     AnalyzeRequest,
     AnalyzeCreateResponse,
+    AnalyzePropertyRequest,
+    AnalyzePropertyCreateResponse,
     AnalysisStatusResponse,
     AnalysisOutputResponse,
 )
 from services.upload_service import upload_service
 from services.database import db_service
 from services.vector_service import vector_service
-from services.analysis_tasks import run_analysis_task
+from services.analysis_tasks import run_analysis_task, run_property_analysis_task
 from services.dependency_checker import dependency_checker
 from services.text_validator import text_validator
+from services.authz import ensure_document_access
+from routes.report_routes import router as report_router
 
 # ============================================================================
 # Logging Configuration
@@ -74,10 +84,17 @@ def setup_logging():
 logger = setup_logging()
 logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await run_startup_checks()
+    yield
+
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="Production-ready document management service for real estate analysis platform"
+    description="Production-ready document management service for real estate analysis platform",
+    lifespan=lifespan,
 )
 
 # ============================================================================
@@ -92,45 +109,139 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(report_router)
+
+
+PUBLIC_PATHS = {
+    "/health",
+    "/openapi.json",
+}
+
+PUBLIC_PREFIXES = (
+    "/docs",
+    "/redoc",
+)
+
+PROTECTED_PREFIXES = (
+    "/upload",
+    "/documents",
+    "/search",
+    "/analyze",
+    "/reports",
+    "/system",
+)
+
+
+def _extract_access_token(request: Request) -> Optional[str]:
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.lower().startswith("bearer "):
+        return auth_header[7:].strip()
+
+    cookie_name = settings.AUTH_COOKIE_NAME or "taqim_session"
+    cookie_token = request.cookies.get(cookie_name)
+    if cookie_token:
+        return cookie_token
+
+    return None
+
+
+def _decode_session(token: str) -> Dict[str, Any]:
+    return jwt.decode(token, settings.AUTH_SECRET, algorithms=["HS256"])
+
+
+def _can_access_document(request: Request, document: Any) -> bool:
+    try:
+        ensure_document_access(request=request, document=document)
+        return True
+    except HTTPException:
+        return False
+
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
+    path = request.url.path
+    if path in PUBLIC_PATHS or any(path.startswith(prefix) for prefix in PUBLIC_PREFIXES):
+        return await call_next(request)
+
+    if not settings.AUTH_REQUIRED:
+        return await call_next(request)
+
+    if not any(path.startswith(prefix) for prefix in PROTECTED_PREFIXES):
+        return await call_next(request)
+
+    if not settings.AUTH_SECRET:
+        logger.error("AUTH_SECRET must be configured when AUTH_REQUIRED=True")
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Authentication service misconfigured"},
+        )
+
+    token = _extract_access_token(request)
+    if not token:
+        return JSONResponse(status_code=401, content={"error": "Authentication required"})
+
+    try:
+        session = _decode_session(token)
+    except InvalidTokenError:
+        return JSONResponse(status_code=401, content={"error": "Invalid authentication token"})
+    except (TypeError, ValueError) as e:
+        logger.error("Token verification failed: %s", str(e))
+        return JSONResponse(status_code=401, content={"error": "Invalid authentication token"})
+
+    role = str(session.get("role", "")).lower()
+    if path.startswith("/system") and role != "admin":
+        return JSONResponse(status_code=403, content={"error": "Admin role required"})
+
+    request.state.session = session
+    return await call_next(request)
+
 
 # ============================================================================
 # Startup and Shutdown Events
 # ============================================================================
 
-@app.on_event("startup")
-async def startup_event():
+async def run_startup_checks():
     """Initialize database, check dependencies, and initialize services on startup."""
     try:
-        # Check system dependencies
-        logger.info("Checking system dependencies...")
-        all_available, warnings, errors = dependency_checker.check_all()
-        
-        # Log dependency status
-        if warnings:
-            logger.warning("Dependency warnings:")
-            for warning in warnings:
-                logger.warning(f"  {warning}")
-        
-        if errors:
-            logger.error("Critical dependency errors:")
-            for error in errors:
-                logger.error(f"  {error}")
-            raise RuntimeError("Critical dependencies missing. Cannot start service.")
-        
-        # Print detailed dependency report
-        dependency_report = dependency_checker.get_status_report()
-        logger.info(f"Dependency Report:\n{dependency_report}")
-        
-        # Log format support status
-        format_support = dependency_checker.get_format_support_status()
-        logger.info(f"Document format support: {format_support}")
-        
+        if settings.AUTH_REQUIRED and not settings.AUTH_SECRET:
+            raise RuntimeError("AUTH_SECRET is required when AUTH_REQUIRED=True")
+
+        if settings.SKIP_DEPENDENCY_CHECK:
+            logger.warning("Skipping dependency checks because SKIP_DEPENDENCY_CHECK=True")
+        else:
+            # Check system dependencies
+            logger.info("Checking system dependencies...")
+            all_available, warnings, errors = dependency_checker.check_all()
+
+            # Log dependency status
+            if warnings:
+                logger.warning("Dependency warnings:")
+                for warning in warnings:
+                    logger.warning(f"  {warning}")
+
+            if errors:
+                logger.error("Critical dependency errors:")
+                for error in errors:
+                    logger.error(f"  {error}")
+                raise RuntimeError("Critical dependencies missing. Cannot start service.")
+
+            # Print detailed dependency report
+            dependency_report = dependency_checker.get_status_report()
+            logger.info(f"Dependency Report:\n{dependency_report}")
+
+            # Log format support status
+            format_support = dependency_checker.get_format_support_status()
+            logger.info(f"Document format support: {format_support}")
+
         # Initialize database
         logger.info("Initializing database...")
         db_service.init_db()
         logger.info("Database initialized successfully")
         
-    except Exception as e:
+    except (RuntimeError, OSError, ValueError, SQLAlchemyError) as e:
         logger.error(f"Failed to initialize service on startup: {str(e)}")
         raise
 
@@ -160,7 +271,7 @@ async def health_check():
     summary="Queue asynchronous analysis for a document",
     tags=["Analysis"]
 )
-async def queue_analysis(request: AnalyzeRequest) -> AnalyzeCreateResponse:
+async def queue_analysis(request: Request, payload: AnalyzeRequest) -> AnalyzeCreateResponse:
     """
     Trigger async document analysis.
 
@@ -170,35 +281,93 @@ async def queue_analysis(request: AnalyzeRequest) -> AnalyzeCreateResponse:
     3. Enqueue Celery task
     """
     try:
-        document = db_service.get_document(request.document_id)
+        document = db_service.get_document(payload.document_id)
         if not document:
             raise HTTPException(
                 status_code=404,
-                detail=f"Document with ID {request.document_id} not found"
+                detail=f"Document with ID {payload.document_id} not found"
             )
+        ensure_document_access(request=request, document=document)
 
         analysis = db_service.create_analysis(
-            document_id=request.document_id,
-            model_version=request.model_version or "v1"
+            document_id=payload.document_id,
+            model_version=payload.model_version or "v1"
         )
         db_service.add_analysis_event(analysis.id, stage="queued")
 
-        task = run_analysis_task.delay(request.document_id, analysis.id)
+        task = run_analysis_task.delay(payload.document_id, analysis.id)
 
         return AnalyzeCreateResponse(
             success=True,
             analysis_id=analysis.id,
-            document_id=request.document_id,
+            document_id=payload.document_id,
             status=analysis.status,
             task_id=task.id,
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except (RuntimeError, OSError, ValueError, SQLAlchemyError) as e:
         logger.error(f"Failed to queue analysis: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail="Internal server error while queuing analysis"
+        )
+
+
+@app.post(
+    "/analyze/property",
+    response_model=AnalyzePropertyCreateResponse,
+    summary="Queue asynchronous analysis for a property dossier",
+    tags=["Analysis"]
+)
+async def queue_property_analysis(request: Request, payload: AnalyzePropertyRequest) -> AnalyzePropertyCreateResponse:
+    """
+    Trigger async property-level analysis over multiple document IDs.
+    """
+    try:
+        document_ids = list(dict.fromkeys(payload.document_ids or []))
+        if not document_ids:
+            raise HTTPException(status_code=400, detail="document_ids is required")
+
+        missing_ids = [doc_id for doc_id in document_ids if not db_service.get_document(doc_id)]
+        if missing_ids:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Documents not found: {missing_ids}",
+            )
+
+        for doc_id in document_ids:
+            ensure_document_access(request=request, document=db_service.get_document(doc_id))
+
+        analysis = db_service.create_analysis(
+            document_id=document_ids[0],
+            model_version="property-v1",
+        )
+        db_service.add_analysis_event(
+            analysis.id,
+            stage="queued_property",
+            payload={
+                "document_ids": document_ids,
+                "property_name": payload.property_name,
+            },
+        )
+
+        run_property_analysis_task.delay(document_ids, analysis.id)
+
+        return AnalyzePropertyCreateResponse(
+            success=True,
+            analysis_id=analysis.id,
+            document_ids=document_ids,
+            status=analysis.status,
+            report_url=f"/reports/{analysis.id}/html",
+        )
+    except HTTPException:
+        raise
+    except (RuntimeError, OSError, ValueError, SQLAlchemyError) as e:
+        logger.error(f"Failed to queue property analysis: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error while queuing property analysis",
         )
 
 
@@ -208,7 +377,7 @@ async def queue_analysis(request: AnalyzeRequest) -> AnalyzeCreateResponse:
     summary="Get analysis status and outputs",
     tags=["Analysis"]
 )
-async def get_analysis_status(analysis_id: int) -> AnalysisStatusResponse:
+async def get_analysis_status(analysis_id: int, request: Request) -> AnalysisStatusResponse:
     """
     Retrieve analysis status and outputs when available.
     """
@@ -219,6 +388,11 @@ async def get_analysis_status(analysis_id: int) -> AnalysisStatusResponse:
                 status_code=404,
                 detail=f"Analysis with ID {analysis_id} not found"
             )
+
+        document = db_service.get_document(analysis.document_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+        ensure_document_access(request=request, document=document)
 
         output = db_service.get_analysis_output(analysis_id)
         response_output = None
@@ -243,7 +417,7 @@ async def get_analysis_status(analysis_id: int) -> AnalysisStatusResponse:
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except (RuntimeError, OSError, ValueError, SQLAlchemyError) as e:
         logger.error(f"Failed to fetch analysis status: {str(e)}")
         raise HTTPException(
             status_code=500,
@@ -319,7 +493,7 @@ async def upload_document(
         
     except HTTPException:
         raise
-    except Exception as e:
+    except (RuntimeError, OSError, ValueError, FileStorageError, SQLAlchemyError) as e:
         logger.error(f"Unexpected error during upload: {str(e)}")
         raise HTTPException(
             status_code=500,
@@ -337,7 +511,7 @@ async def upload_document(
     summary="Get document metadata",
     tags=["Documents"]
 )
-async def get_document(document_id: int) -> DocumentResponse:
+async def get_document(document_id: int, request: Request) -> DocumentResponse:
     """
     Retrieve document metadata by ID.
     
@@ -360,12 +534,13 @@ async def get_document(document_id: int) -> DocumentResponse:
                 status_code=404,
                 detail=f"Document with ID {document_id} not found"
             )
+        ensure_document_access(request=request, document=document)
         
-        return DocumentResponse.from_orm(document)
+        return DocumentResponse.model_validate(document)
         
     except HTTPException:
         raise
-    except Exception as e:
+    except (RuntimeError, OSError, ValueError, SQLAlchemyError) as e:
         logger.error(f"Error retrieving document: {str(e)}")
         raise HTTPException(
             status_code=500,
@@ -379,7 +554,7 @@ async def get_document(document_id: int) -> DocumentResponse:
     summary="Get extracted text",
     tags=["Documents"]
 )
-async def get_document_text(document_id: int) -> ExtractedTextResponse:
+async def get_document_text(document_id: int, request: Request) -> ExtractedTextResponse:
     """
     Retrieve extracted text content for a document.
     
@@ -403,6 +578,7 @@ async def get_document_text(document_id: int) -> ExtractedTextResponse:
                 status_code=404,
                 detail=f"Document with ID {document_id} not found"
             )
+        ensure_document_access(request=request, document=document)
         
         # Get extracted text
         extracted_text = db_service.get_document_text(document_id)
@@ -414,11 +590,11 @@ async def get_document_text(document_id: int) -> ExtractedTextResponse:
                 detail=f"Extracted text not found for document ID {document_id}"
             )
         
-        return ExtractedTextResponse.from_orm(extracted_text)
+        return ExtractedTextResponse.model_validate(extracted_text)
         
     except HTTPException:
         raise
-    except Exception as e:
+    except (RuntimeError, OSError, ValueError, SQLAlchemyError) as e:
         logger.error(f"Error retrieving extracted text: {str(e)}")
         raise HTTPException(
             status_code=500,
@@ -432,7 +608,7 @@ async def get_document_text(document_id: int) -> ExtractedTextResponse:
     summary="Get document with extracted text",
     tags=["Documents"]
 )
-async def get_document_with_text(document_id: int) -> DocumentWithTextResponse:
+async def get_document_with_text(document_id: int, request: Request) -> DocumentWithTextResponse:
     """
     Retrieve document metadata along with extracted text.
     
@@ -455,17 +631,18 @@ async def get_document_with_text(document_id: int) -> DocumentWithTextResponse:
                 status_code=404,
                 detail=f"Document with ID {document_id} not found"
             )
+        ensure_document_access(request=request, document=document)
         
         extracted_text = db_service.get_document_text(document_id)
         
         return DocumentWithTextResponse(
-            document=DocumentResponse.from_orm(document),
-            extracted_text=ExtractedTextResponse.from_orm(extracted_text) if extracted_text else None
+            document=DocumentResponse.model_validate(document),
+            extracted_text=ExtractedTextResponse.model_validate(extracted_text) if extracted_text else None
         )
         
     except HTTPException:
         raise
-    except Exception as e:
+    except (RuntimeError, OSError, ValueError, SQLAlchemyError) as e:
         logger.error(f"Error retrieving full document: {str(e)}")
         raise HTTPException(
             status_code=500,
@@ -480,6 +657,7 @@ async def get_document_with_text(document_id: int) -> DocumentWithTextResponse:
     tags=["Documents"]
 )
 async def list_documents(
+    request: Request,
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0)
 ) -> list:
@@ -496,9 +674,10 @@ async def list_documents(
     try:
         logger.info(f"Listing documents: limit={limit}, offset={offset}")
         documents = db_service.get_all_documents(limit=limit, offset=offset)
-        return [DocumentResponse.from_orm(doc) for doc in documents]
+        documents = [doc for doc in documents if _can_access_document(request, doc)]
+        return [DocumentResponse.model_validate(doc) for doc in documents]
         
-    except Exception as e:
+    except (RuntimeError, OSError, ValueError, SQLAlchemyError) as e:
         logger.error(f"Error listing documents: {str(e)}")
         raise HTTPException(
             status_code=500,
@@ -517,6 +696,7 @@ async def list_documents(
     tags=["Search"]
 )
 async def search_document(
+    request: Request,
     document_id: int,
     query: str = Query(..., min_length=1, description="Search query text"),
     k: int = Query(5, ge=1, le=20, description="Number of results to return")
@@ -549,6 +729,7 @@ async def search_document(
                 status_code=404,
                 detail=f"Document with ID {document_id} not found"
             )
+        ensure_document_access(request=request, document=document)
         
         # Perform semantic search
         search_results = vector_service.search_document(
@@ -590,7 +771,7 @@ async def search_document(
         
     except HTTPException:
         raise
-    except Exception as e:
+    except (RuntimeError, OSError, ValueError, SQLAlchemyError) as e:
         logger.error(f"Error during document search: {str(e)}")
         raise HTTPException(
             status_code=500,
@@ -605,6 +786,7 @@ async def search_document(
     tags=["Search"]
 )
 async def search_all_documents(
+    request: Request,
     query: str = Query(..., min_length=1, description="Search query text"),
     document_ids: str = Query(None, description="Comma-separated document IDs to search (optional)"),
     k: int = Query(10, ge=1, le=50, description="Number of results to return")
@@ -641,6 +823,17 @@ async def search_all_documents(
                     status_code=400,
                     detail="Invalid document IDs format. Use comma-separated integers."
                 )
+
+            for doc_id in doc_ids:
+                document = db_service.get_document(doc_id)
+                if not document:
+                    raise HTTPException(status_code=404, detail=f"Document with ID {doc_id} not found")
+                ensure_document_access(request=request, document=document)
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="document_ids is required for cross-document search",
+            )
         
         # Perform cross-document semantic search
         search_results = vector_service.search_all_documents(
@@ -682,7 +875,7 @@ async def search_all_documents(
         
     except HTTPException:
         raise
-    except Exception as e:
+    except (RuntimeError, OSError, ValueError, SQLAlchemyError) as e:
         logger.error(f"Error during cross-document search: {str(e)}")
         raise HTTPException(
             status_code=500,
@@ -699,7 +892,7 @@ async def search_all_documents(
     summary="Get document extraction health report",
     tags=["Documents"]
 )
-async def get_document_health(document_id: int):
+async def get_document_health(document_id: int, request: Request):
     """
     Get health assessment for document text extraction.
     
@@ -726,6 +919,7 @@ async def get_document_health(document_id: int):
                 status_code=404,
                 detail=f"Document with ID {document_id} not found"
             )
+        ensure_document_access(request=request, document=document)
         
         # Get extracted text
         extracted_text = db_service.get_document_text(document_id)
@@ -767,7 +961,7 @@ async def get_document_health(document_id: int):
         
     except HTTPException:
         raise
-    except Exception as e:
+    except (RuntimeError, OSError, ValueError, SQLAlchemyError) as e:
         logger.error(f"Error generating health report: {str(e)}")
         raise HTTPException(
             status_code=500,
@@ -803,7 +997,7 @@ async def get_system_status():
             "debug_mode": settings.DEBUG
         }
         
-    except Exception as e:
+    except (RuntimeError, OSError, ValueError) as e:
         logger.error(f"Error generating system status: {str(e)}")
         raise HTTPException(
             status_code=500,
@@ -812,105 +1006,6 @@ async def get_system_status():
 
 
 # ============================================================================
-
-# ============================================================================
-# Stage 3: Report Generation Endpoints
-# ============================================================================
-
-@app.post("/reports/{analysis_id}")
-async def create_report(
-    analysis_id: int,
-    include_pdf: bool = True,
-    save_html: bool = True
-):
-    """Generate complete analysis report from existing analysis."""
-    try:
-        from services.report_generator import report_generator
-        from datetime import datetime
-
-        analysis = db_service.get_analysis(analysis_id)
-        if not analysis:
-            raise HTTPException(status_code=404, detail="Analysis not found")
-
-        output = db_service.get_analysis_output(analysis_id)
-        if not output:
-            raise HTTPException(status_code=404, detail="Analysis output not found")
-
-        document = db_service.get_document(analysis.document_id)
-        if not document:
-            raise HTTPException(status_code=404, detail="Document not found")
-
-        analysis_dict = {
-            'risk_analysis': output.risk_json or {},
-            'legal_analysis': output.legal_json or {},
-            'valuation_analysis': output.valuation_json or {},
-            'final_analysis': output.final_json or {},
-            'material_concerns': [],
-        }
-
-        # Generate report
-        logger.info(f"Generating report for analysis {analysis_id}")
-        report = report_generator.generate_report(
-            property_id=document.property_id or str(analysis.document_id),
-            analysis_data=analysis_dict,
-            include_pdf=include_pdf,
-            save_html=save_html,
-            metadata={
-                'date': datetime.now().isoformat(),
-                'analysis_id': analysis_id,
-                'document_id': analysis.document_id,
-                'filename': document.filename,
-            }
-        )
-        
-        return {
-            "report_id": report.report_id,
-            "property_id": report.property_id,
-            "status": report.status,
-            "generated_at": report.analysis_date,
-            "files": {
-                "pdf_path": report.pdf_path,
-            },
-            "error": report.error_message,
-        }
-        
-    except Exception as e:
-        logger.error(f"Error creating report: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/reports/{report_id}")
-async def get_report(report_id: str):
-    """Get report metadata and status."""
-    try:
-        from services.report_generator import report_generator
-        
-        report_meta = report_generator.get_report(report_id)
-        if not report_meta:
-            raise HTTPException(status_code=404, detail="Report not found")
-        
-        return report_meta
-        
-    except Exception as e:
-        logger.error(f"Error getting report: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/reports")
-async def list_reports(limit: int = 10):
-    """List generated reports."""
-    try:
-        from services.report_generator import report_generator
-        
-        reports = report_generator.list_reports()
-        return {
-            "total": len(reports),
-            "reports": reports[:limit]
-        }
-        
-    except Exception as e:
-        logger.error(f"Error listing reports: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 # Error Handlers
 # ============================================================================

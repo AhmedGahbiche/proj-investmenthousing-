@@ -57,10 +57,10 @@ export default function PropertyReportPage() {
       setLoading(true);
       setError("");
       try {
-        const res = await fetch(`${BACKEND}/analyze/${analysisId}`);
+        const res = await fetch(`${BACKEND}/analyze/${analysisId}`, { credentials: "include" });
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data?.detail || "Failed to load analysis report");
+          throw new Error(data?.detail || data?.error || "Failed to load analysis report");
         }
         if (mounted) {
           setAnalysis(data as AnalysisPayload);

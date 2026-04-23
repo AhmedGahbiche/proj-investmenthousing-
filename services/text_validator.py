@@ -6,7 +6,6 @@ import logging
 import re
 import unicodedata
 from typing import Tuple, Optional
-import sys
 
 logger = logging.getLogger(__name__)
 

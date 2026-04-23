@@ -4,12 +4,22 @@ Handles file saving and retrieval from disk.
 """
 import os
 import logging
-import shutil
+import re
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
+from threading import Lock
+from typing import Optional
 from config import settings
 
 logger = logging.getLogger(__name__)
+
+
+_file_storage_instance: Optional["FileStorageService"] = None
+_file_storage_lock = Lock()
+
+
+class FileStorageError(RuntimeError):
+    """Raised when storage operations fail due to IO/runtime faults."""
 
 
 class FileStorageService:
@@ -36,10 +46,24 @@ class FileStorageService:
         Returns:
             Unique filename with timestamp
         """
-        name, ext = os.path.splitext(original_filename)
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+        safe_original = self._sanitize_filename(original_filename)
+        name, ext = os.path.splitext(safe_original)
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")[:-3]
         unique_filename = f"{name}_{timestamp}{ext}"
         return unique_filename
+
+    @staticmethod
+    def _sanitize_filename(original_filename: str) -> str:
+        """Normalize potentially unsafe filenames to a safe basename."""
+        basename = Path(original_filename or "").name
+        if not basename:
+            raise ValueError("Filename is empty")
+
+        sanitized = re.sub(r"[^A-Za-z0-9._-]", "_", basename)
+        if sanitized in {".", "..", ""}:
+            raise ValueError("Filename is invalid")
+
+        return sanitized
     
     def save_file(self, file_content: bytes, original_filename: str) -> str:
         """
@@ -58,7 +82,11 @@ class FileStorageService:
         try:
             # Generate unique filename to prevent overwrites
             unique_filename = self.generate_unique_filename(original_filename)
-            file_path = self.base_path / unique_filename
+            file_path = (self.base_path / unique_filename).resolve()
+
+            base_resolved = self.base_path.resolve()
+            if file_path != base_resolved and base_resolved not in file_path.parents:
+                raise ValueError("Resolved path escapes storage directory")
             
             # Write file to disk
             with open(file_path, 'wb') as f:
@@ -68,12 +96,9 @@ class FileStorageService:
             # Return relative path for database storage
             return str(file_path.relative_to(Path.cwd()))
             
-        except IOError as e:
+        except OSError as e:
             logger.error(f"IO error while saving file: {str(e)}")
-            raise Exception(f"Failed to save file: {str(e)}")
-        except Exception as e:
-            logger.error(f"Unexpected error while saving file: {str(e)}")
-            raise Exception(f"Unexpected error saving file: {str(e)}")
+            raise FileStorageError("Failed to save file") from e
     
     def read_file(self, file_path: str) -> bytes:
         """
@@ -102,9 +127,9 @@ class FileStorageService:
         except FileNotFoundError as e:
             logger.error(f"File not found: {str(e)}")
             raise
-        except IOError as e:
+        except OSError as e:
             logger.error(f"IO error while reading file: {str(e)}")
-            raise Exception(f"Failed to read file: {str(e)}")
+            raise FileStorageError("Failed to read file") from e
     
     def delete_file(self, file_path: str) -> bool:
         """
@@ -129,9 +154,9 @@ class FileStorageService:
                 logger.warning(f"File not found for deletion: {file_path}")
                 return False
                 
-        except Exception as e:
+        except OSError as e:
             logger.error(f"Error deleting file: {str(e)}")
-            raise Exception(f"Failed to delete file: {str(e)}")
+            raise FileStorageError("Failed to delete file") from e
     
     def file_exists(self, file_path: str) -> bool:
         """
@@ -146,5 +171,22 @@ class FileStorageService:
         return Path(file_path).exists()
 
 
-# Global file storage service instance
-file_storage = FileStorageService()
+def get_file_storage() -> "FileStorageService":
+    """Return a lazily initialized singleton file storage service instance."""
+    global _file_storage_instance
+    if _file_storage_instance is None:
+        with _file_storage_lock:
+            if _file_storage_instance is None:
+                _file_storage_instance = FileStorageService()
+    return _file_storage_instance
+
+
+class _LazyFileStorageServiceProxy:
+    """Compatibility proxy to keep existing `file_storage.*` call sites unchanged."""
+
+    def __getattr__(self, name):
+        return getattr(get_file_storage(), name)
+
+
+# Lazy file storage service proxy (keeps import API stable)
+file_storage = _LazyFileStorageServiceProxy()

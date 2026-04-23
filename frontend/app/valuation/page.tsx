@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import SharedNavbar from "@/components/SharedNavbar";
+import { fetchBackendJson } from "@/lib/backendApi";
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
@@ -10,8 +11,7 @@ export default function ValuationPage() {
   const [documents, setDocuments] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch(`${BACKEND}/documents?limit=20&skip=0`)
-      .then((r) => r.json())
+    fetchBackendJson<any[]>(`${BACKEND}/documents?limit=20&offset=0`)
       .then((data) => setDocuments(Array.isArray(data) ? data : []))
       .catch(() => setDocuments([]));
   }, []);

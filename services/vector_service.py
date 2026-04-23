@@ -3,12 +3,18 @@ Vector embedding service for generating and managing text embeddings.
 Handles text chunking and embedding generation using sentence-transformers.
 """
 import logging
+from threading import Lock
 from typing import List, Tuple
+from typing import Optional
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from services.vector_index import vector_index_manager
 
 logger = logging.getLogger(__name__)
+
+
+_vector_service_instance: Optional["VectorService"] = None
+_vector_service_lock = Lock()
 
 
 class VectorService:
@@ -21,16 +27,23 @@ class VectorService:
         Args:
             model_name: Name of sentence-transformers model
         """
-        try:
-            logger.info(f"Loading embedding model: {model_name}")
-            self.model = SentenceTransformer(model_name)
-            self.model_name = model_name
-            self.embedding_dim = 384  # all-MiniLM-L6-v2 produces 384-dim vectors
-            self.vector_index = vector_index_manager  # Expose index manager for direct access
-            logger.info(f"Model loaded successfully. Embedding dimension: {self.embedding_dim}")
-        except Exception as e:
-            logger.error(f"Failed to load embedding model: {str(e)}")
-            raise
+        self.model_name = model_name
+        self.embedding_dim = 384  # all-MiniLM-L6-v2 produces 384-dim vectors
+        self.vector_index = vector_index_manager  # Expose index manager for direct access
+        self.model: Optional[SentenceTransformer] = None
+        logger.info("Vector service initialized. Embedding model will be lazy-loaded on first use")
+
+    def _get_model(self) -> SentenceTransformer:
+        """Load and cache the embedding model on first use."""
+        if self.model is None:
+            try:
+                logger.info(f"Loading embedding model: {self.model_name}")
+                self.model = SentenceTransformer(self.model_name)
+                logger.info("Embedding model loaded successfully")
+            except Exception as e:
+                logger.error(f"Failed to load embedding model: {str(e)}")
+                raise
+        return self.model
     
     def chunk_text(
         self,
@@ -92,7 +105,7 @@ class VectorService:
                 return np.array([], dtype=np.float32).reshape(0, self.embedding_dim)
             
             logger.info(f"Generating embeddings for {len(texts)} texts")
-            embeddings = self.model.encode(
+            embeddings = self._get_model().encode(
                 texts,
                 convert_to_numpy=True,
                 show_progress_bar=False
@@ -265,12 +278,29 @@ class VectorService:
             Numpy array of shape (384,)
         """
         try:
-            embedding = self.model.encode(text, convert_to_numpy=True)
+            embedding = self._get_model().encode(text, convert_to_numpy=True)
             return embedding
         except Exception as e:
             logger.error(f"Failed to generate embedding: {str(e)}")
             raise
 
 
-# Global vector service instance
-vector_service = VectorService()
+def get_vector_service() -> "VectorService":
+    """Return a lazily initialized singleton vector service instance."""
+    global _vector_service_instance
+    if _vector_service_instance is None:
+        with _vector_service_lock:
+            if _vector_service_instance is None:
+                _vector_service_instance = VectorService()
+    return _vector_service_instance
+
+
+class _LazyVectorServiceProxy:
+    """Compatibility proxy to keep existing `vector_service.*` call sites unchanged."""
+
+    def __getattr__(self, name):
+        return getattr(get_vector_service(), name)
+
+
+# Lazy vector service proxy (keeps import API stable)
+vector_service = _LazyVectorServiceProxy()

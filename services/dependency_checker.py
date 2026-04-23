@@ -4,8 +4,6 @@ Ensures OCR, image processing, and document parsing tools are properly installed
 """
 import logging
 import subprocess
-import sys
-from pathlib import Path
 from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
