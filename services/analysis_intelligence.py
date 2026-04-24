@@ -7,6 +7,7 @@ from typing import Dict, List
 
 from openai import OpenAI
 from config import settings
+from services.analysis_schemas import validate_module_output
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +114,8 @@ class AnalysisIntelligenceService:
             "recommendations": [""],
             "evidence": [""],
         }
-        return self._call_json("legal", schema_hint, document_text, contexts)
+        raw = self._call_json("legal", schema_hint, document_text, contexts)
+        return validate_module_output("legal", raw)
 
     def risk_analysis(self, document_text: str, contexts: List[Dict]) -> Dict:
         schema_hint = {
@@ -126,7 +128,8 @@ class AnalysisIntelligenceService:
             "recommendations": [""],
             "evidence": [""],
         }
-        return self._call_json("risk", schema_hint, document_text, contexts)
+        raw = self._call_json("risk", schema_hint, document_text, contexts)
+        return validate_module_output("risk", raw)
 
     def valuation_analysis(self, document_text: str, contexts: List[Dict]) -> Dict:
         schema_hint = {
@@ -138,7 +141,8 @@ class AnalysisIntelligenceService:
             "recommendations": [""],
             "evidence": [""],
         }
-        return self._call_json("valuation", schema_hint, document_text, contexts)
+        raw = self._call_json("valuation", schema_hint, document_text, contexts)
+        return validate_module_output("valuation", raw)
 
     def final_due_diligence(
         self,
@@ -193,7 +197,8 @@ class AnalysisIntelligenceService:
         )
 
         content = response.choices[0].message.content if response.choices else "{}"
-        return _safe_json_loads(content)
+        raw = _safe_json_loads(content)
+        return validate_module_output("final", raw)
 
 
 analysis_intelligence_service = AnalysisIntelligenceService()

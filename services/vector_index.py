@@ -8,9 +8,11 @@ import pickle
 import re
 from collections import OrderedDict
 from pathlib import Path
-from typing import Optional, Tuple, List
+from threading import Lock as ThreadLock
+from typing import Dict, Optional, Tuple, List
 import numpy as np
 import faiss
+from filelock import FileLock
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -41,8 +43,24 @@ class VectorIndexManager:
         # Store indices in memory: {document_id: (faiss_index, id_to_chunk_map)}
         self.indices = OrderedDict()
         self.doc_centroids: dict[int, np.ndarray] = {}
-        
+
+        # Per-document write locks: thread-level registry, file-level locking for multi-process safety.
+        self._lock_registry: Dict[int, FileLock] = {}
+        self._registry_lock = ThreadLock()
+
         logger.info(f"Vector index manager initialized with directory: {self.index_dir}")
+
+    def _write_lock(self, document_id: int) -> FileLock:
+        """Return a per-document FileLock, creating it if needed.
+
+        FileLock uses an OS-level lockfile so multiple processes (Docker replicas,
+        multiple Celery workers) block rather than corrupt the FAISS index files.
+        """
+        with self._registry_lock:
+            if document_id not in self._lock_registry:
+                lock_path = self.index_dir / f"document_{document_id}.lock"
+                self._lock_registry[document_id] = FileLock(str(lock_path), timeout=30)
+            return self._lock_registry[document_id]
 
     def _touch_index(self, document_id: int) -> None:
         """Mark an index as recently used for LRU eviction."""
@@ -224,16 +242,31 @@ class VectorIndexManager:
     ) -> bool:
         """
         Add embedding vectors to a document's index.
-        
+
         Args:
             document_id: ID of the document
             embeddings: Array of shape (N, 384) with N embedding vectors
             chunk_ids: List of chunk IDs (must match embeddings length)
             chunk_texts: List of original texts (must match embeddings length)
-            
+
         Returns:
             True if successful
         """
+        try:
+            with self._write_lock(document_id):
+                return self._add_vectors_locked(document_id, embeddings, chunk_ids, chunk_texts)
+        except Exception as e:
+            logger.error(f"Failed to add vectors for document {document_id}: {str(e)}")
+            raise
+
+    def _add_vectors_locked(
+        self,
+        document_id: int,
+        embeddings: np.ndarray,
+        chunk_ids: List[str],
+        chunk_texts: List[str]
+    ) -> bool:
+        """Inner add_vectors implementation; caller must hold _write_lock(document_id)."""
         try:
             if document_id not in self.indices:
                 if not self.load_index(document_id):
@@ -394,41 +427,58 @@ class VectorIndexManager:
     def save_index(self, document_id: int) -> bool:
         """
         Save FAISS index to disk for persistence.
-        
+
+        Uses a per-document FileLock so concurrent workers cannot write the
+        same index simultaneously and corrupt the files.
+
         Args:
             document_id: ID of the document
-            
+
         Returns:
             True if successful
         """
         try:
-            if document_id not in self.indices:
-                logger.warning(f"Index not found for document {document_id}")
-                return False
-            
-            index_file = self.index_dir / f"document_{document_id}.index"
-            metadata_file = self.index_dir / f"document_{document_id}.pkl"
-            
-            doc_data = self.indices[document_id]
-            
-            # Save FAISS index
-            faiss.write_index(doc_data['index'], str(index_file))
-            
-            # Save metadata (chunk IDs and texts)
+            with self._write_lock(document_id):
+                return self._save_index_locked(document_id)
+        except Exception as e:
+            logger.error(f"Failed to save index for document {document_id}: {str(e)}")
+            return False
+
+    def _save_index_locked(self, document_id: int) -> bool:
+        """Inner save_index; caller must hold _write_lock(document_id)."""
+        if document_id not in self.indices:
+            logger.warning(f"Index not found for document {document_id}")
+            return False
+
+        index_file = self.index_dir / f"document_{document_id}.index"
+        metadata_file = self.index_dir / f"document_{document_id}.pkl"
+        tmp_index = index_file.with_suffix(".index.tmp")
+        tmp_meta = metadata_file.with_suffix(".pkl.tmp")
+
+        doc_data = self.indices[document_id]
+
+        try:
+            # Write to temp files first, then atomically rename to avoid
+            # partial writes being visible to concurrent readers.
+            faiss.write_index(doc_data['index'], str(tmp_index))
+
             metadata = {
                 'chunk_ids': doc_data['chunk_ids'],
                 'texts': doc_data['texts'],
                 'centroid': doc_data['centroid'].tolist() if doc_data.get('centroid') is not None else None,
             }
-            with open(metadata_file, 'wb') as f:
+            with open(tmp_meta, 'wb') as f:
                 pickle.dump(metadata, f)
-            
+
+            tmp_index.replace(index_file)
+            tmp_meta.replace(metadata_file)
+
             logger.info(f"Saved FAISS index for document {document_id}")
             return True
-            
-        except Exception as e:
-            logger.error(f"Failed to save index for document {document_id}: {str(e)}")
-            return False
+        except Exception:
+            tmp_index.unlink(missing_ok=True)
+            tmp_meta.unlink(missing_ok=True)
+            raise
     
     def load_index(self, document_id: int) -> bool:
         """
@@ -476,30 +526,32 @@ class VectorIndexManager:
     def delete_index(self, document_id: int) -> bool:
         """
         Delete FAISS index for a document.
-        
+
         Args:
             document_id: ID of the document
-            
+
         Returns:
             True if successful
         """
         try:
-            # Remove from memory
-            if document_id in self.indices:
-                del self.indices[document_id]
-            self.doc_centroids.pop(document_id, None)
-            
-            # Remove from disk
-            index_file = self.index_dir / f"document_{document_id}.index"
-            metadata_file = self.index_dir / f"document_{document_id}.pkl"
-            
-            for file_path in [index_file, metadata_file]:
-                if file_path.exists():
-                    file_path.unlink()
-            
+            with self._write_lock(document_id):
+                if document_id in self.indices:
+                    del self.indices[document_id]
+                self.doc_centroids.pop(document_id, None)
+
+                for suffix in [".index", ".pkl", ".index.tmp", ".pkl.tmp"]:
+                    p = self.index_dir / f"document_{document_id}{suffix}"
+                    p.unlink(missing_ok=True)
+
+            # Release and drop the lock entry so the lockfile itself can be removed.
+            with self._registry_lock:
+                self._lock_registry.pop(document_id, None)
+            lock_file = self.index_dir / f"document_{document_id}.lock"
+            lock_file.unlink(missing_ok=True)
+
             logger.info(f"Deleted FAISS index for document {document_id}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to delete index for document {document_id}: {str(e)}")
             return False

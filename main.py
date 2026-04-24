@@ -4,13 +4,14 @@ Provides REST endpoints for document upload, retrieval, and text extraction.
 """
 import logging
 import json
+import uuid
 from typing import Any, Dict, Optional
 from contextlib import asynccontextmanager
-from logging.handlers import RotatingFileHandler
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pathlib import Path
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp
 import jwt
 from jwt import InvalidTokenError
 from sqlalchemy.exc import SQLAlchemyError
@@ -38,51 +39,47 @@ from services.analysis_tasks import run_analysis_task, run_property_analysis_tas
 from services.dependency_checker import dependency_checker
 from services.text_validator import text_validator
 from services.authz import ensure_document_access
+from services.logging_config import configure_logging, set_log_context, clear_log_context
 from routes.report_routes import router as report_router
 
 # ============================================================================
 # Logging Configuration
 # ============================================================================
 
-def setup_logging():
-    """Configure application logging."""
-    log_dir = Path(settings.LOG_DIR)
-    log_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Create logger
-    logger = logging.getLogger()
-    logger.setLevel(getattr(logging, settings.LOG_LEVEL))
-    
-    # File handler
-    file_handler = RotatingFileHandler(
-        log_dir / "app.log",
-        maxBytes=10 * 1024 * 1024,  # 10 MB
-        backupCount=5
-    )
-    file_formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    file_handler.setFormatter(file_formatter)
-    logger.addHandler(file_handler)
-    
-    # Console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(getattr(logging, settings.LOG_LEVEL))
-    console_formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    console_handler.setFormatter(console_formatter)
-    logger.addHandler(console_handler)
-    
-    return logger
+configure_logging(log_dir=settings.LOG_DIR, log_level=settings.LOG_LEVEL)
+logger = logging.getLogger(__name__)
+logger.info("Starting %s v%s", settings.APP_NAME, settings.APP_VERSION)
+
+
+# ============================================================================
+# Request ID Middleware
+# ============================================================================
+
+class RequestIdMiddleware(BaseHTTPMiddleware):
+    """
+    Inject a unique request_id into every request's log context.
+
+    The ID is taken from the incoming X-Request-ID header (so upstream proxies
+    can supply a trace ID) or generated as a UUID4 if absent. It is added to
+    every log record emitted during the request via the thread-local context
+    filter in logging_config, and echoed back in the X-Request-ID response header
+    so clients can correlate their own logs.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex
+        set_log_context(request_id=request_id)
+        try:
+            response = await call_next(request)
+            response.headers["X-Request-ID"] = request_id
+            return response
+        finally:
+            clear_log_context("request_id")
 
 
 # ============================================================================
 # FastAPI Application Setup
 # ============================================================================
-
-logger = setup_logging()
-logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
 
 
 @asynccontextmanager
@@ -101,6 +98,7 @@ app = FastAPI(
 # CORS Configuration
 # ============================================================================
 
+app.add_middleware(RequestIdMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"],
@@ -457,17 +455,34 @@ async def upload_document(
     """
     try:
         logger.info(f"Received upload request for file: {file.filename}")
-        
+
+        # Reject oversized uploads before reading the body into memory.
+        # Content-Length is not guaranteed, so we cap the read with a sentinel byte.
+        if file.size is not None and file.size > settings.MAX_FILE_SIZE:
+            max_mb = settings.MAX_FILE_SIZE / (1024 * 1024)
+            raise HTTPException(
+                status_code=413,
+                detail=f"File exceeds maximum allowed size ({max_mb:.0f} MB)",
+            )
+
         # Read file content
         content = await file.read()
-        
+
+        # Secondary size check for clients that don't send Content-Length.
+        if len(content) > settings.MAX_FILE_SIZE:
+            max_mb = settings.MAX_FILE_SIZE / (1024 * 1024)
+            raise HTTPException(
+                status_code=413,
+                detail=f"File exceeds maximum allowed size ({max_mb:.0f} MB)",
+            )
+
         if not content:
             logger.warning("Upload failed: empty file content")
             raise HTTPException(
                 status_code=400,
                 detail="File content is empty"
             )
-        
+
         # Process upload through service
         result = upload_service.process_upload(
             filename=file.filename,

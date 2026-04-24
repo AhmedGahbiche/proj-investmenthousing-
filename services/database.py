@@ -16,6 +16,7 @@ from models import (
     VectorEmbedding,
     Analysis,
     AnalysisOutput,
+    AnalysisModuleOutput,
     AnalysisEvent,
 )
 
@@ -388,64 +389,120 @@ class DatabaseService:
         legal_json: dict = None,
         risk_json: dict = None,
         valuation_json: dict = None,
-        final_json: dict = None
+        final_json: dict = None,
     ) -> AnalysisOutput:
         """
-        Save or update analysis output payloads.
+        Compatibility shim: delegates to save_module_output for each non-None module.
+
+        Prefer calling save_module_output() directly so each module is
+        checkpointed as it resolves rather than in a single end-of-pipeline batch.
+        This shim exists so any remaining callers outside analysis_tasks.py
+        continue to work without modification.
+        """
+        for module_name, payload in [
+            ("legal", legal_json),
+            ("risk", risk_json),
+            ("valuation", valuation_json),
+            ("final", final_json),
+        ]:
+            if payload is not None:
+                self.save_module_output(analysis_id, module_name, payload)
+
+        synthetic = AnalysisOutput(
+            analysis_id=analysis_id,
+            legal_json=legal_json,
+            risk_json=risk_json,
+            valuation_json=valuation_json,
+            final_json=final_json,
+        )
+        return synthetic
+
+    def save_module_output(self, analysis_id: int, module_name: str, output: dict) -> None:
+        """
+        Checkpoint a single module's output into analysis_module_outputs.
+
+        Upserts by (analysis_id, module_name) so repeated calls (e.g. on retry)
+        overwrite rather than duplicate. The status is derived from the output
+        dict: a 'partial' status key set by _resolve_module_result marks a
+        timed-out or errored module.
 
         Args:
-            analysis_id: Analysis ID
-            legal_json: Legal module output
-            risk_json: Risk module output
-            valuation_json: Valuation module output
-            final_json: Aggregated final output
+            analysis_id: Analysis ID.
+            module_name: One of 'legal', 'risk', 'valuation', 'final'.
+            output: Module result dict.
 
-        Returns:
-            Saved AnalysisOutput object
+        Raises:
+            ValueError: If module_name is not a recognised value.
         """
+        valid_modules = {"legal", "risk", "valuation", "final"}
+        if module_name not in valid_modules:
+            raise ValueError(f"Unknown module name: {module_name!r}")
+
+        status = "partial" if (isinstance(output, dict) and output.get("status") == "partial") else "completed"
+
         session = self.get_session()
         try:
-            output = session.query(AnalysisOutput).filter(
-                AnalysisOutput.analysis_id == analysis_id
+            row = session.query(AnalysisModuleOutput).filter(
+                AnalysisModuleOutput.analysis_id == analysis_id,
+                AnalysisModuleOutput.module_name == module_name,
             ).first()
-
-            if output:
-                output.legal_json = legal_json
-                output.risk_json = risk_json
-                output.valuation_json = valuation_json
-                output.final_json = final_json
-            else:
-                output = AnalysisOutput(
+            if row is None:
+                row = AnalysisModuleOutput(
                     analysis_id=analysis_id,
-                    legal_json=legal_json,
-                    risk_json=risk_json,
-                    valuation_json=valuation_json,
-                    final_json=final_json,
+                    module_name=module_name,
+                    output_json=output,
+                    status=status,
                 )
-                session.add(output)
-
+                session.add(row)
+            else:
+                row.output_json = output
+                row.status = status
+                row.created_at = datetime.utcnow()
             session.commit()
-            session.refresh(output)
-            return output
         except Exception as e:
             session.rollback()
-            logger.error(f"Failed to save analysis output: {str(e)}")
+            logger.error(
+                "Failed to checkpoint module output analysis_id=%s module=%s: %s",
+                analysis_id, module_name, str(e),
+            )
             raise
         finally:
             session.close()
 
-    def get_analysis_output(self, analysis_id: int) -> AnalysisOutput:
+    def get_analysis_output(self, analysis_id: int) -> Optional[AnalysisOutput]:
         """
         Retrieve analysis outputs by analysis ID.
 
+        Reads from the normalized analysis_module_outputs table and reconstructs
+        a synthetic AnalysisOutput object so callers see the unchanged interface.
+        Falls back to the legacy analysis_outputs row if no normalized rows exist
+        (supports analyses run before the migration).
+
         Args:
-            analysis_id: Analysis ID
+            analysis_id: Analysis ID.
 
         Returns:
-            AnalysisOutput or None
+            AnalysisOutput-like object with four JSON fields, or None.
         """
         session = self.get_session()
         try:
+            module_rows = (
+                session.query(AnalysisModuleOutput)
+                .filter(AnalysisModuleOutput.analysis_id == analysis_id)
+                .all()
+            )
+            if module_rows:
+                by_module = {r.module_name: r.output_json for r in module_rows}
+                synthetic = AnalysisOutput(
+                    analysis_id=analysis_id,
+                    legal_json=by_module.get("legal"),
+                    risk_json=by_module.get("risk"),
+                    valuation_json=by_module.get("valuation"),
+                    final_json=by_module.get("final"),
+                )
+                return synthetic
+
+            # Fallback: pre-migration row in legacy table.
             return session.query(AnalysisOutput).filter(
                 AnalysisOutput.analysis_id == analysis_id
             ).first()
@@ -484,6 +541,50 @@ class DatabaseService:
             session.rollback()
             logger.error(f"Failed to add analysis event: {str(e)}")
             raise
+        finally:
+            session.close()
+
+
+    def get_stuck_analyses(self, processing_threshold_minutes: int = 30) -> list:
+        """
+        Return analyses stuck in terminal-pending states.
+
+        'queued' with no started_at: broker drop or pre-acks_late loss — any queued
+        analysis is suspect since a healthy pickup takes seconds.
+
+        'processing' past the threshold: worker crashed or OOM-killed mid-pipeline.
+
+        Analysis has no created_at column, so queued detection is conservative:
+        all queued analyses are returned and the watchdog re-enqueues them. With
+        acks_late enabled, true duplicates are rare.
+
+        Args:
+            processing_threshold_minutes: Minutes after started_at before a
+                processing analysis is considered stuck.
+
+        Returns:
+            List of Analysis objects.
+        """
+        from datetime import timedelta
+        session = self.get_session()
+        try:
+            processing_cutoff = datetime.utcnow() - timedelta(minutes=processing_threshold_minutes)
+
+            stuck_queued = (
+                session.query(Analysis)
+                .filter(Analysis.status == "queued", Analysis.started_at.is_(None))
+                .all()
+            )
+            stuck_processing = (
+                session.query(Analysis)
+                .filter(
+                    Analysis.status == "processing",
+                    Analysis.started_at.isnot(None),
+                    Analysis.started_at < processing_cutoff,
+                )
+                .all()
+            )
+            return stuck_queued + stuck_processing
         finally:
             session.close()
 

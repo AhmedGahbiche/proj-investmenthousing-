@@ -2,7 +2,7 @@
 Database models for document management service.
 """
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Index, JSON
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Index, JSON, UniqueConstraint
 from sqlalchemy.orm import declarative_base
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
@@ -171,6 +171,32 @@ class AnalysisOutput(Base):
     final_json = Column(JSON, nullable=True)
 
 
+class AnalysisModuleOutput(Base):
+    """
+    Normalized replacement for the wide AnalysisOutput table.
+
+    One row per module per analysis run. Replaces storing four JSON blobs as
+    columns on a single row, which prevented partial-completion tracking and
+    made schema evolution expensive.
+
+    module_name is one of: 'legal', 'risk', 'valuation', 'final'.
+    status is one of: 'completed', 'partial', 'failed'.
+    """
+    __tablename__ = "analysis_module_outputs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    analysis_id = Column(Integer, ForeignKey("analyses.id", ondelete="CASCADE"), nullable=False)
+    module_name = Column(String(50), nullable=False)
+    output_json = Column(JSON, nullable=True)
+    status = Column(String(20), nullable=False, default="completed")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("analysis_id", "module_name", name="uq_analysis_module"),
+        Index("idx_module_outputs_analysis_id", "analysis_id"),
+    )
+
+
 class AnalysisEvent(Base):
     """
     SQLAlchemy model for optional analysis stage events.
@@ -255,7 +281,12 @@ class AnalyzePropertyCreateResponse(BaseModel):
 
 
 class AnalysisOutputResponse(BaseModel):
-    """Schema for analysis output payload."""
+    """Schema for analysis output payload.
+
+    Preserves the original four-field API contract regardless of whether the
+    underlying storage is the old wide AnalysisOutput row or the new normalized
+    AnalysisModuleOutput rows.
+    """
     legal_json: Optional[dict] = None
     risk_json: Optional[dict] = None
     valuation_json: Optional[dict] = None

@@ -20,6 +20,7 @@ numpy==2.4.4
 scipy==1.17.1
 celery==5.5.3
 redis==5.1.1
+filelock==3.16.1
 openai==1.109.1
 PyJWT==2.12.1
 import-linter==2.11

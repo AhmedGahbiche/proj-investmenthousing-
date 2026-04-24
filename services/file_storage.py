@@ -2,11 +2,10 @@
 File storage service module for managing persistent file storage.
 Handles file saving and retrieval from disk.
 """
-import os
 import logging
 import re
+import uuid
 from pathlib import Path
-from datetime import datetime, timezone
 from threading import Lock
 from typing import Optional
 from config import settings
@@ -38,23 +37,37 @@ class FileStorageService:
     
     def generate_unique_filename(self, original_filename: str) -> str:
         """
-        Generate a unique filename to avoid conflicts.
-        
+        Generate a UUID-based filename that carries no user-controlled bytes.
+
+        The original extension (sanitized to alphanumeric only) is preserved so
+        that the file's format remains detectable without trusting the full name.
+
         Args:
-            original_filename: Original uploaded filename
-            
+            original_filename: Original uploaded filename.
+
         Returns:
-            Unique filename with timestamp
+            UUID-prefixed filename, e.g. '3f2a1b…c9.pdf'.
         """
-        safe_original = self._sanitize_filename(original_filename)
-        name, ext = os.path.splitext(safe_original)
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")[:-3]
-        unique_filename = f"{name}_{timestamp}{ext}"
-        return unique_filename
+        safe_ext = self._safe_extension(original_filename)
+        return f"{uuid.uuid4().hex}{safe_ext}"
+
+    @staticmethod
+    def _safe_extension(original_filename: str) -> str:
+        """Return a dot-prefixed, alphanumeric-only extension, or '' if absent."""
+        name = Path(original_filename or "").name
+        if "." not in name:
+            return ""
+        raw_ext = name.rsplit(".", 1)[-1]
+        safe = re.sub(r"[^A-Za-z0-9]", "", raw_ext).lower()
+        return f".{safe}" if safe else ""
 
     @staticmethod
     def _sanitize_filename(original_filename: str) -> str:
-        """Normalize potentially unsafe filenames to a safe basename."""
+        """Normalize potentially unsafe filenames to a safe basename.
+
+        Used only for validation; storage paths are UUID-based and never
+        contain user-controlled bytes.
+        """
         basename = Path(original_filename or "").name
         if not basename:
             raise ValueError("Filename is empty")
